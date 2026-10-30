@@ -72,7 +72,7 @@ test('a window running out says so', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
 
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /LOW/ }))?.text).toBe(' LOW')
+  expect((await ui.find({ type: 'Text', text: /LOW/ }))?.text).toBe(' LOW ')
   await ui.unmount()
 })
 

@@ -44,7 +44,7 @@ test('a finished build names itself and its version', async ($, on) => {
 
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect((await ui.find({ type: 'Text', text: /BUILD/ }))?.text).toBe('BUILD')
-  expect((await ui.find({ type: 'Text', text: /built/ }))?.text).toBe('✓ built')
+  expect((await ui.find({ type: 'Text', text: /built/ }))?.text).toBe(' ✓ built ')
   expect((await ui.find({ type: 'Text', text: /2\.4\.1/ }))?.text).toBe('web-app 2.4.1 · npm run build')
   await ui.unmount()
 })
@@ -60,7 +60,7 @@ test('a failed build shows the first error line', async ($, on) => {
   await $.tool.call({ tool: 'Bash', command: 'npm run build', tool_use_id: 'b1' })
 
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect((await ui.find({ type: 'Text', text: /failed/ }))?.text).toBe('✗ failed')
+  expect((await ui.find({ type: 'Text', text: /failed/ }))?.text).toBe(' ✗ failed ')
   expect((await ui.find({ type: 'Text', text: /TS2345/ }))?.text).toBe(
     'src/lib/cart.ts(42,9): error TS2345: Argument of type string',
   )

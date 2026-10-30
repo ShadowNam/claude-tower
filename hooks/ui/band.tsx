@@ -6,7 +6,7 @@ import { rewarmCost } from '../core/prices'
 import { readAgents, readBuilds, readTank, readTick, readUsage } from '../core/state'
 import { unseenOf } from '../core/tank'
 import { cacheView, TTL_MIN } from '../core/usage'
-import { BAD, DIM, EMPTY, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
+import { BAD, BG, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
 import type { UsageWindow } from '../../types'
 
@@ -147,7 +147,7 @@ export const registerBand: Feature = (on, options) => {
           <Text color={p.color}>{p.on}</Text>
           <Text color={EMPTY}>{p.off}</Text>
           <Text color={p.color} bold> {p.left}% left</Text>
-          {p.isLow ? <Text color={BAD} bold> LOW</Text> : null}
+          {p.isLow ? <Text backgroundColor={BAD} color={INK} bold>{' LOW '}</Text> : null}
           {p.reset === '' ? null : <Text color={DIM}> · {p.reset}</Text>}
           {p.empty === '' ? null : <Text color={WARN} bold> · out ~{p.empty}</Text>}
         </Box>
@@ -165,7 +165,7 @@ export const registerBand: Feature = (on, options) => {
           </Box>
           <Box flexDirection="row">
             <Text color={p.color} bold>{p.left}% left</Text>
-            {p.isLow ? <Text color={BAD} bold> LOW</Text> : null}
+            {p.isLow ? <Text backgroundColor={BAD} color={INK} bold>{' LOW '}</Text> : null}
           </Box>
           {p.reset === '' ? null : <Text color={DIM}>resets {p.reset}</Text>}
           {p.empty === '' ? null : <Text color={WARN} bold>out ~{p.empty}</Text>}
@@ -179,7 +179,7 @@ export const registerBand: Feature = (on, options) => {
       needsYou > 0 || unreachable > 0 ? (
         <Box key="tank" flexDirection="row" flexShrink={0} marginRight={3}>
           <Text color={TEXT} bold>TANK </Text>
-          {needsYou > 0 ? <Text color={WARN} bold>{needsYou} need you</Text> : null}
+          {needsYou > 0 ? <Text backgroundColor={WARN} color={INK} bold>{` ${needsYou} need you `}</Text> : null}
           {needsYou > 0 && unreachable > 0 ? <Text color={DIM}> · </Text> : null}
           {unreachable > 0 ? <Text color={BAD} bold>{unreachable} unreachable</Text> : null}
           <Text color={DIM}> /tower-tank</Text>
@@ -202,7 +202,7 @@ export const registerBand: Feature = (on, options) => {
       if (view.mode === 'warm') {
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
-            <Text color={OK} bold>WARM</Text>
+            <Text backgroundColor={OK} color={INK} bold>{' WARM '}</Text>
             <Text color={DIM}> {Math.max(0, TTL_MIN - view.idleMin)}m left</Text>
           </Box>
         )
@@ -210,7 +210,7 @@ export const registerBand: Feature = (on, options) => {
         const cost = rewarmCost(view.model, view.tokens)
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
-            <Text color={WARN} bold>COLD</Text>
+            <Text backgroundColor={WARN} color={INK} bold>{' COLD '}</Text>
             <Text color={DIM}> {since(view.idleMs)} idle</Text>
             <Text color={DIM}> · </Text>
             <Text color={TEXT} bold>{cost === null ? '$?' : usd(cost)}</Text>
@@ -309,12 +309,12 @@ export const registerBand: Feature = (on, options) => {
             </Box>
           ) : b.state === 'failed' ? (
             <Box flexDirection="row" flexShrink={0}>
-              <Text color={BAD} bold>{'✗'} failed</Text>
+              <Text backgroundColor={BAD} color={INK} bold>{' ✗ failed '}</Text>
               <Text color={DIM}> after {build.elapsed} · {b.tool}</Text>
             </Box>
           ) : (
             <Box flexDirection="row" flexShrink={0}>
-              <Text color={OK} bold>{'✓'} built</Text>
+              <Text backgroundColor={OK} color={INK} bold>{' ✓ built '}</Text>
               <Text color={DIM}> in {build.elapsed}</Text>
               {faster !== null && Math.abs(faster) > 2_000 ? (
                 <Text color={DIM}> · {since(Math.abs(faster))} {faster > 0 ? 'faster' : 'slower'} than usual</Text>
@@ -352,8 +352,10 @@ export const registerBand: Feature = (on, options) => {
 
     return (
       <Box flexDirection="column">
-        {rows}
-        {buildRows}
+        <Box flexDirection="column" backgroundColor={BG}>
+          {rows}
+          {buildRows}
+        </Box>
         {below}
       </Box>
     )

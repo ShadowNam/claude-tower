@@ -50,6 +50,6 @@ test('a clean load reports no failures', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
 
   const { text } = await $.command.run({ command: 'tower' })
-  expect(text).toContain('Tower v2.2.0')
+  expect(text).toContain('Tower v2.3.0')
   expect(text).not.toContain('did not start')
 })

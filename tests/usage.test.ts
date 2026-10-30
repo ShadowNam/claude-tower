@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { project, projectWithin, trim } from '../hooks/core/burn'
 import { priceOf, rewarmCost } from '../hooks/core/prices'
-import { cacheView, fold } from '../hooks/core/usage'
+import { cacheView, compactionOf, fold, headroom } from '../hooks/core/usage'
 
 import type { Sample, Usage } from '../types'
 
@@ -120,4 +120,45 @@ test('a model the price table does not name is priced as unknown', async () => {
 
   // 100k tokens written again at $8 per million.
   expect(rewarmCost('claude-opus-5-5', 100_000)).toBe(0.8)
+})
+
+test('the context figure measures against the window compaction fires on', async () => {
+  // The engine's own typings: the compaction window "may be smaller than
+  // `window`". Dividing by the larger one understates how close the session is
+  // to being compacted, which is the only decision this figure drives.
+  const measured = compactionOf(null, {
+    changed: ['context'],
+    rateLimits: [],
+    context: {
+      tokens: 120_000,
+      window: 1_000_000,
+      breakdown: {
+        totalTokens: 120_000,
+        rawMaxTokens: 200_000,
+        autoCompactThreshold: 160_000,
+        isAutoCompactEnabled: true,
+      },
+    },
+  })
+
+  expect(measured?.max).toBe(200_000)
+  expect(headroom(measured)).toBe(40_000)
+  // Against the model's window that reads 12%; against the real one, 60%.
+  expect(Math.round((120_000 / 1_000_000) * 100)).toBe(12)
+  expect(Math.round((measured!.used / measured!.max) * 100)).toBe(60)
+})
+
+test('nothing is claimed about compaction unless the engine said it', async () => {
+  const base = { changed: ['context'], rateLimits: [], context: { tokens: 1, window: 1 } } as const
+
+  // No breakdown in this measurement keeps whatever the last one said.
+  const kept = { max: 200_000, used: 10, firesAt: 160_000, isEnabled: true }
+  expect(compactionOf(kept, base)).toEqual(kept)
+  expect(compactionOf(null, base)).toBe(null)
+
+  // Auto-compaction off, or no threshold named, means no claim at all.
+  expect(headroom({ max: 200_000, used: 10, firesAt: 160_000, isEnabled: false })).toBe(null)
+  expect(headroom({ max: 200_000, used: 10, firesAt: null, isEnabled: true })).toBe(null)
+  // Already past it is not a negative distance; it is nothing worth saying.
+  expect(headroom({ max: 200_000, used: 170_000, firesAt: 160_000, isEnabled: true })).toBe(null)
 })

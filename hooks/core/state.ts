@@ -21,6 +21,7 @@ const tick = atom({ plugin: 'tower', key: 'tick' } as const, 0)
 /** One value for the whole band, so a measurement redraws it exactly once. */
 export const EMPTY_USAGE: Usage = {
   windows: [],
+  compaction: null,
   cache: null,
   ledger: { usd: null, tokens: 0, window: 0 },
   samples: {},

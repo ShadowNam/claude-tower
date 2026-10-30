@@ -3,16 +3,25 @@ import type { EngineInterface } from 'claude-code'
 import { projectWithin, trim } from './burn'
 import { until } from './fmt'
 import type { Feature } from './kinds'
-import { bumpTick, writeUsage } from './state'
+import { bumpTick, readAgents, readBuilds, readUsage, writeUsage } from './state'
 
-import type { CacheFacts, Sample, Usage, UsageWindow } from '../../types'
+import type { CacheFacts, Compaction, Sample, Usage, UsageWindow } from '../../types'
 
 /** How long a prompt cache stays warm on this plan. */
 export const TTL_MS = 60 * 60_000
 export const TTL_MIN = 60
 
-/** How often countdowns are refreshed. Minutes move slowly; this is plenty. */
+/** How often countdowns are refreshed while something on screen is moving. */
 const TICK_MS = 30_000
+/**
+ * How many ticks are skipped when nothing on screen changes faster than an
+ * hour. A reset countdown reading `5d 7h` does not need touching twice a
+ * minute, and a redraw every thirty seconds forever is what gets a mod blamed
+ * for the app feeling warm.
+ */
+const SLOW_EVERY = 10
+/** Below this much left on a countdown, the figure is worth watching closely. */
+const SOON_MS = 60 * 60_000
 
 /** 7-day first, then 5-hour: the slow limit, then the one that bites today. */
 const ORDER: Readonly<Record<string, number>> = { seven_day: 0, five_hour: 1 }
@@ -50,8 +59,43 @@ export function cacheView(cache: CacheFacts | null, now: number): CacheView | nu
 export type MeasureFacts = {
   changed: readonly string[]
   rateLimits: readonly { kind: string; percentUsed: number; resetsAt?: string }[]
-  context: { tokens: number; window: number }
+  context: {
+    tokens: number
+    window: number
+    breakdown?: {
+      totalTokens?: number
+      rawMaxTokens?: number
+      autoCompactThreshold?: number
+      isAutoCompactEnabled?: boolean
+    }
+  }
   cost?: { usd: number }
+}
+
+/**
+ * The breakdown read into what the band draws, or the previous reading when
+ * this measurement carried none. Pure, so the arithmetic can be tested without
+ * an engine.
+ */
+export function compactionOf(prev: Compaction | null, e: MeasureFacts): Compaction | null {
+  const b = e.context.breakdown
+  if (b === undefined) return prev
+  const max = typeof b.rawMaxTokens === 'number' && b.rawMaxTokens > 0 ? b.rawMaxTokens : 0
+  if (max === 0) return prev
+  const used = typeof b.totalTokens === 'number' && b.totalTokens >= 0 ? b.totalTokens : 0
+  const firesAt =
+    typeof b.autoCompactThreshold === 'number' && b.autoCompactThreshold > 0 ? b.autoCompactThreshold : null
+  return { max, used, firesAt, isEnabled: b.isAutoCompactEnabled === true }
+}
+
+/**
+ * Tokens left before compaction fires, or null when nothing can be claimed —
+ * auto-compaction switched off, no threshold named, or already past it.
+ */
+export function headroom(c: Compaction | null): number | null {
+  if (c === null || !c.isEnabled || c.firesAt === null) return null
+  const left = c.firesAt - c.used
+  return left > 0 ? left : null
 }
 
 /**
@@ -89,7 +133,7 @@ export function fold(prev: Usage, e: MeasureFacts, now: number): Usage {
   // price re-sending it without waiting for another turn.
   const cache = prev.cache === null ? null : { ...prev.cache, tokens: ledger.tokens, window: ledger.window }
 
-  return { windows, cache, ledger, samples }
+  return { windows, cache, ledger, samples, compaction: compactionOf(prev.compaction, e) }
 }
 
 /**
@@ -98,13 +142,51 @@ export function fold(prev: Usage, e: MeasureFacts, now: number): Usage {
  */
 export async function startUsage($: EngineInterface): Promise<void> {
   const now = await $.clock.now()
-  const u = await $.session.usage()
+  // 'summary' estimates locally and sends nothing; 'full' would bill a
+  // token-count request per tool and memory file, which a band must never do.
+  const u = await $.session.usage({ breakdown: 'summary' })
   await writeUsage($, prev =>
     fold(prev, { changed: ['rateLimits', 'context'], rateLimits: u.rateLimits, context: u.context }, now),
   )
+  let skipped = 0
   $.clock.every(TICK_MS, () => {
-    void bumpTick($)
+    void (async () => {
+      const at = await $.clock.now()
+      if (await isMoving($, at)) {
+        skipped = 0
+        await bumpTick($)
+        return
+      }
+      skipped += 1
+      if (skipped >= SLOW_EVERY) {
+        skipped = 0
+        await bumpTick($)
+      }
+    })()
   })
+}
+
+/**
+ * Whether anything the band draws changes within the hour.
+ *
+ * The band's figures are nearly all countdowns, and a countdown an hour out is
+ * drawn in hours — so refreshing it every thirty seconds redraws an idle
+ * session to produce an identical row. This asks whether any of them is close
+ * enough that the next tick would actually change a character.
+ */
+export async function isMoving($: EngineInterface, now: number): Promise<boolean> {
+  const u = await readUsage($)
+  if (u.cache !== null && u.cache.lastAt > 0 && now - u.cache.lastAt < TTL_MS) return true
+  for (const w of u.windows) {
+    if (w.emptyAt !== null && w.emptyAt - now < SOON_MS) return true
+    if (w.resetsAt === undefined) continue
+    const at = Date.parse(w.resetsAt)
+    if (Number.isFinite(at) && at - now < SOON_MS) return true
+  }
+  const builds = await readBuilds($)
+  if (builds.some(b => b.state === 'running')) return true
+  const agents = await readAgents($)
+  return agents.some(a => a.status === 'running')
 }
 
 /**
@@ -163,7 +245,9 @@ export const registerUsage: Feature = (on, options) => {
     } else if ((e.source === 'resume' || e.source === 'fork') && typeof e.seconds_since_last_response === 'number') {
       const now = await $.clock.now()
       const lastAt = now - e.seconds_since_last_response * 1000
-      const u = await $.session.usage()
+      // 'summary' estimates locally and sends nothing; 'full' would bill a
+  // token-count request per tool and memory file, which a band must never do.
+  const u = await $.session.usage({ breakdown: 'summary' })
       const model = typeof e.model === 'string' ? e.model : await $.session.model()
       await writeUsage($, prev => ({
         ...prev,

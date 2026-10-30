@@ -106,6 +106,10 @@ export type Totals = {
   running: number
   done: number
   failed: number
+  /** Running, but no model request for STUCK_MS. */
+  stalled: number
+  /** How long the longest-silent run has been silent, or 0 when none is. */
+  stalledMs: number
   /** Null when any run used a model the price table does not name. */
   costUsd: number | null
   input: number
@@ -144,10 +148,18 @@ export function totalsOf(list: readonly AgentRun[], now: number): Totals {
     agentMs += Math.max(0, end - a.startedAt)
   }
 
+  // A run that has asked for nothing in two minutes is the only fact here
+  // that wants a person now, and it was the one the band dropped.
+  const quiet = subs.filter(
+    a => a.status === 'running' && a.tool === undefined && a.steps > 0 && now - a.lastStepAt > STUCK_MS,
+  )
+
   return {
     running: subs.filter(a => a.status === 'running').length,
     done: subs.filter(a => a.status === 'done').length,
     failed: subs.filter(a => a.status === 'failed').length,
+    stalled: quiet.length,
+    stalledMs: quiet.reduce((worst, a) => Math.max(worst, now - a.lastStepAt), 0),
     costUsd,
     input,
     output,
@@ -333,7 +345,7 @@ export const registerAgents: Feature = (on, options) => {
     const panel = await readPanel($)
     if (!panel.autoOpened) {
       await writePanel($, prev => ({ ...prev, autoOpened: true }))
-      void $.ui.open({ id: PANE, title: 'Agents' })
+      void $.ui.open({ id: PANE, title: 'Tower agents' })
     }
     return started
   }).catch(($, e, next) => next(e))
@@ -345,7 +357,7 @@ export const registerAgents: Feature = (on, options) => {
       await $.ui.close({ id: PANE })
       return { text: 'Agents panel closed.' }
     }
-    const placed = await $.ui.open({ id: PANE, title: 'Agents' })
+    const placed = await $.ui.open({ id: PANE, title: 'Tower agents' })
     if (placed.isPlaced === false) {
       return { text: `No room for the panel at this width. ${list.length} agents tracked; the band has the summary.` }
     }

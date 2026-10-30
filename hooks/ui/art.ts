@@ -33,6 +33,25 @@ import { BG, EMPTY } from './theme'
  * choose. The shapes are here; the words stay Text elements beside them.
  */
 
+/**
+ * A drawing's own stylesheet.
+ *
+ * `<style>` works inside a plain `Svg` — no `isInteractive` needed — and so do
+ * keyframes and `prefers-reduced-motion`. Movement is for liveness only: a
+ * thing that is running looks like it is running, and nothing else moves. A
+ * band that animates for decoration is a band that gets switched off.
+ */
+function styles(id: string, alive: boolean): string {
+  if (!alive) return ''
+  return (
+    '<style>' +
+    `@keyframes ${id}p{0%,100%{opacity:1}50%{opacity:.55}}` +
+    `.${id}a{animation:${id}p 2.4s ease-in-out infinite}` +
+    `@media (prefers-reduced-motion: reduce){.${id}a{animation:none}}` +
+    '</style>'
+  )
+}
+
 /** Shown size in CSS pixels, and the 2× box the shapes are drawn in. */
 const METER_W = 84
 const METER_H = 14
@@ -146,7 +165,7 @@ function profile(id: string, base: Rgb): string {
  * the empty floor, and a bright leading edge. It is the one edge in the whole
  * drawing that carries the reading, so it gets the budget.
  */
-export function capsule(leftPercent: number, color: string): string {
+export function capsule(leftPercent: number, color: string, title = ''): string {
   const id = uid()
   const base = parse(color)
   const fill = (clamp(leftPercent) / 100) * TRACK_W
@@ -165,6 +184,7 @@ export function capsule(leftPercent: number, color: string): string {
     METER_W,
     METER_H,
     [
+      title === '' ? '' : `<title>${title.replace(/[<>&]/g, '')}</title>`,
       '<defs>',
       `<clipPath id="${id}k"><rect x="${TRACK_X}" y="${TRACK_Y}" width="${TRACK_W}" height="${TRACK_H}" rx="${TRACK_R}"/></clipPath>`,
       // The floor is opaque, so the drawing never depends on what is behind it.
@@ -237,7 +257,7 @@ export const CAPSULE_SIZE = { width: METER_W, height: METER_H } as const
  * the one pair no hex can separate for a deuteranope, so the distinction
  * cannot rest on hue.
  */
-export function orb(color: string, shape: 'round' | 'alert' = 'round'): string {
+export function orb(color: string, shape: 'round' | 'alert' = 'round', alive = false): string {
   const id = uid()
   const base = parse(color)
   const S = ORB * SCALE
@@ -277,7 +297,8 @@ export function orb(color: string, shape: 'round' | 'alert' = 'round'): string {
       '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>',
       '</radialGradient>',
       '</defs>',
-      `<circle cx="${c}" cy="${c}" r="${c}" fill="url(#${id}h)"/>`,
+      styles(id, alive),
+      `<circle cx="${c}" cy="${c}" r="${c}" fill="url(#${id}h)"${alive ? ` class="${id}a"` : ''}/>`,
       body,
       rim,
       // The colour's own light coming back off the lower-left.

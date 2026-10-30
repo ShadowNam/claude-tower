@@ -58,8 +58,29 @@ export type Ledger = {
 }
 
 /** Everything the usage band draws, in one value so one write redraws it once. */
+/**
+ * What the engine says about compaction, or null until it has said.
+ *
+ * `window` and the compaction window are not the same number: the typings say
+ * the compaction window "may be smaller than `window`", and compaction fires
+ * against the smaller one. Dividing by the wrong one understates how close the
+ * session is to being compacted, which is the single decision this figure
+ * drives.
+ */
+export type Compaction = {
+  /** The window compaction actually measures against. */
+  max: number
+  /** Tokens in use, as the breakdown estimates them. */
+  used: number
+  /** Where auto-compaction fires, when it is on and the engine names it. */
+  firesAt: number | null
+  isEnabled: boolean
+}
+
 export type Usage = {
   windows: readonly UsageWindow[]
+  /** Null until a measurement has carried a breakdown. */
+  compaction: Compaction | null
   cache: CacheFacts | null
   ledger: Ledger
   /** Recent readings per window kind, trailing and capped. */

@@ -221,3 +221,28 @@ test('every drawing in the agents panel says what it is', async ($, on) => {
   expect(drawings.some(d => altOf(d) === 'running')).toBe(true)
   await ui.unmount()
 })
+
+test('only a running thing moves, and never when motion is unwelcome', async () => {
+  // Animation is for liveness. A stalled or finished run is exactly what must
+  // NOT move, because movement reads as progress.
+  const alive = orb('#86c06a', 'round', true)
+  const still = orb('#86c06a', 'round', false)
+
+  expect(alive).toContain('@keyframes')
+  expect(alive).toContain('prefers-reduced-motion: reduce')
+  expect(still).not.toContain('@keyframes')
+  expect(still).not.toContain('class=')
+
+  // The keyframe name is per-drawing, or two orbs in one row share a timeline.
+  const nameOf = (s: string) => /@keyframes (\w+)/.exec(s)?.[1]
+  expect(nameOf(alive)).not.toBe(nameOf(orb('#58b0cf', 'round', true)))
+})
+
+test('a title is what a hover reads, and cannot carry markup out', async () => {
+  const titled = capsule(62, '#e8893c', '7D: 62% left, 5d 9h')
+  expect(titled).toContain('<title>7D: 62% left, 5d 9h</title>')
+  // No title, no element: a tooltip of nothing is worse than none.
+  expect(capsule(62, '#e8893c')).not.toContain('<title>')
+  // A title is text from elsewhere, so it is stripped before it is markup.
+  expect(capsule(62, '#e8893c', '</title><script>x</script>')).not.toContain('<script')
+})

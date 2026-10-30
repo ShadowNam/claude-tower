@@ -1,11 +1,11 @@
-import { totalsOf } from '../core/agents'
+import { PANE, totalsOf } from '../core/agents'
 import { headlineOf, othersOf, viewOf } from '../core/builds'
 import { at, dots, since, tokens, until, usd } from '../core/fmt'
 import { CAPSULE_SIZE, capsule, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
 import { readAgents, readBuilds, readTick, readUsage } from '../core/state'
-import { cacheView, TTL_MIN } from '../core/usage'
+import { cacheView, headroom, TTL_MIN } from '../core/usage'
 import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
 import type { UsageWindow } from '../../types'
@@ -113,6 +113,13 @@ export const registerBand: Feature = (on, options) => {
     const bare = windowList.length === 0 && view === null && !busy && build === null
     const knowsLedger = u.ledger.window > 0 || u.ledger.usd !== null
 
+    // Against the window compaction measures, where the engine has named one:
+    // it may be smaller than the model's, and the smaller one is what fires.
+    const ctxMax = u.compaction?.max ?? u.ledger.window
+    const ctxUsed = u.compaction?.used ?? u.ledger.tokens
+    const ctxPercent = ctxMax > 0 ? Math.round((ctxUsed / ctxMax) * 100) : null
+    const left = headroom(u.compaction)
+
     if (quiet && !(wantsUsage && knowsLedger)) return next(e)
 
     // Other mods' bands draw under this one. The engine's own placeholder is
@@ -122,7 +129,7 @@ export const registerBand: Feature = (on, options) => {
       drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
 
     const ui = $.ui.resolve(e)
-    const { Box, Text } = ui
+    const { Box, Button, Text } = ui
     // The terminal's table still lists Svg, so ask the surface, not the table.
     const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 100
@@ -131,7 +138,7 @@ export const registerBand: Feature = (on, options) => {
     const cells = isWide || isStacked ? CELLS : TIGHT_CELLS
 
     const label = (
-      <Box key="label" flexShrink={0} marginRight={2} flexDirection="row" alignItems="center">
+      <Box key="label" flexShrink={0} flexDirection="row" alignItems="center" gap={1}>
         {Svg === null ? null : (
           <Box marginRight={1}>
             <Svg source={mark(ORANGE)} alt="Tower" {...MARK_SIZE} />
@@ -144,7 +151,7 @@ export const registerBand: Feature = (on, options) => {
     const wideWindow = (w: UsageWindow, i: number) => {
       const p = partOf(w, now, cells)
       return (
-        <Box key={`w${i}`} flexDirection="row" flexShrink={0} marginRight={3}>
+        <Box key={`w${i}`} flexDirection="row" flexShrink={0}>
           <Text color={DIM} weight="bold">{p.name} </Text>
           {Svg === null ? (
             <>
@@ -152,7 +159,7 @@ export const registerBand: Feature = (on, options) => {
               <Text color={EMPTY}>{p.off}</Text>
             </>
           ) : (
-            <Svg source={capsule(p.left, p.color)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
+            <Svg source={capsule(p.left, p.color, `${p.name}: ${p.left}% left${p.reset === '' ? '' : `, ${p.reset}`}`)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
           )}
           <Text color={p.color} weight="bold" tabular> {p.left}% left</Text>
           {p.isLow ? <Text backgroundColor={BAD} color={INK} weight="bold">{' LOW '}</Text> : null}
@@ -165,7 +172,7 @@ export const registerBand: Feature = (on, options) => {
     const blockWindow = (w: UsageWindow, i: number) => {
       const p = partOf(w, now, cells)
       return (
-        <Box key={`w${i}`} flexDirection="column" flexShrink={0} marginRight={3}>
+        <Box key={`w${i}`} flexDirection="column" flexShrink={0}>
           <Box flexDirection="row" alignItems="center">
             <Text color={DIM} weight="bold">{p.name} </Text>
             {Svg === null ? (
@@ -174,7 +181,7 @@ export const registerBand: Feature = (on, options) => {
                 <Text color={EMPTY}>{p.off}</Text>
               </>
             ) : (
-              <Svg source={capsule(p.left, p.color)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
+              <Svg source={capsule(p.left, p.color, `${p.name}: ${p.left}% left${p.reset === '' ? '' : `, ${p.reset}`}`)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
             )}
           </Box>
           <Box flexDirection="row">
@@ -190,16 +197,27 @@ export const registerBand: Feature = (on, options) => {
     const windows = windowList.map(isWide ? wideWindow : blockWindow)
 
 
+    // A press is a later event, not part of this draw, so it may do what a
+    // render may not.
+    const openAgents = () => {
+      void $.ui.open({ id: PANE, title: 'Tower agents' })
+    }
+
     const crew =
       busy && agents !== null ? (
-        <Box key="crew" flexDirection="row" flexShrink={0} marginRight={3} alignItems="center">
+        <Box key="crew" flexDirection="row" flexShrink={0} alignItems="center">
           {Svg === null ? null : (
-            <Svg source={orb(agents.failed > 0 ? BAD : OK, agents.failed > 0 ? 'alert' : 'round')} alt="running" {...ORB_SIZE} />
+            <Svg source={orb(agents.failed > 0 ? BAD : agents.stalled > 0 ? WARN : OK, agents.failed > 0 ? 'alert' : 'round', agents.stalled === 0)} alt="running" {...ORB_SIZE} />
           )}
           <Text color={OK} weight="bold"> {agents.running} running</Text>
+          {agents.stalled > 0 ? (
+            <Text color={WARN} weight="bold" tabular> · {agents.stalled} stalled {since(agents.stalledMs)}</Text>
+          ) : null}
           {agents.failed > 0 ? <Text color={BAD} weight="bold"> · {agents.failed} failed</Text> : null}
           <Text color={DIM}> · {agents.costUsd === null ? '$?' : usd(agents.costUsd)}</Text>
-          <Text color={DIM}> /tower-agents</Text>
+          <Button key="open-agents" hotkey="1" plain dimColor onPress={openAgents}>
+            <Text dimColor>/tower-agents</Text>
+          </Button>
         </Box>
       ) : null
 
@@ -208,7 +226,7 @@ export const registerBand: Feature = (on, options) => {
     if (view !== null) {
       if (view.mode === 'warm') {
         cache = (
-          <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
+          <Box key="cache" flexDirection="row" flexShrink={0}>
             {Svg === null ? (
               <Text backgroundColor={OK} color={INK} weight="bold">{' WARM '}</Text>
             ) : (
@@ -223,7 +241,7 @@ export const registerBand: Feature = (on, options) => {
       } else {
         const cost = rewarmCost(view.model, view.tokens)
         cache = (
-          <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
+          <Box key="cache" flexDirection="row" flexShrink={0}>
             {Svg === null ? (
               <Text backgroundColor={COLD} color={INK} weight="bold">{' COLD '}</Text>
             ) : (
@@ -244,11 +262,15 @@ export const registerBand: Feature = (on, options) => {
     // Normally a wide-terminal extra; with no windows to draw it is the row's
     // only content, so width stops deciding.
     const ctx =
-      (columns >= CTX_AT || bare) && u.ledger.window > 0 ? (
-        <Box key="ctx" flexDirection="row" flexShrink={0} marginRight={3}>
+      (columns >= CTX_AT || bare) && ctxPercent !== null ? (
+        <Box key="ctx" flexDirection="row" flexShrink={0}>
           <Text color={DIM}>ctx </Text>
-          <Text color={TEXT} tabular>{Math.round((u.ledger.tokens / u.ledger.window) * 100)}%</Text>
-          <Text color={DIM}> of {tokens(u.ledger.window)}</Text>
+          <Text color={ctxPercent >= 90 ? WARN : TEXT} tabular>{ctxPercent}%</Text>
+          {left === null ? (
+            <Text color={DIM}> of {tokens(u.compaction?.max ?? u.ledger.window)}</Text>
+          ) : (
+            <Text color={DIM}> · compact in ~{tokens(left)}</Text>
+          )}
         </Box>
       ) : null
 
@@ -263,13 +285,13 @@ export const registerBand: Feature = (on, options) => {
     // Said once, while the windows are still unknown: it tells the difference
     // between a mod with no news and a mod that is not there.
     const waiting = bare ? (
-      <Box key="waiting" flexDirection="row" flexShrink={0} marginRight={3}>
+      <Box key="waiting" flexDirection="row" flexShrink={0}>
         <Text color={DIM}>windows not measured yet · /tower</Text>
       </Box>
     ) : null
 
     const row = (
-      <Box key="row" flexDirection="row" paddingX={1}>
+      <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center">
         {label}
         {windows}
         {crew}
@@ -287,11 +309,11 @@ export const registerBand: Feature = (on, options) => {
       isWide || isStacked || bare
         ? [row]
         : [
-            <Box key="row" flexDirection="row" paddingX={1}>
+            <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center">
               {label}
               {windows}
             </Box>,
-            <Box key="tail" flexDirection="row" paddingX={1}>
+            <Box key="tail" flexDirection="row" paddingX={1} gap={3} alignItems="center">
                     {crew}
               {cache}
               {cost}

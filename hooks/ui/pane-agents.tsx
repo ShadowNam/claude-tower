@@ -123,7 +123,7 @@ export const registerAgentsPane: Feature = (on, options) => {
             <Text color={COLOR[run.status] ?? TEXT}>{GLYPH[run.status] ?? '●'} </Text>
           ) : (
             <Box marginRight={1}>
-              <Svg source={orb(COLOR[run.status] ?? TEXT, run.status === 'failed' ? 'alert' : 'round')} alt={run.status} {...ORB_SIZE} />
+              <Svg source={orb(COLOR[run.status] ?? TEXT, run.status === 'failed' ? 'alert' : 'round', run.status === 'running' && !isStuck)} alt={run.status} {...ORB_SIZE} />
             </Box>
           )}
           <Text color={TEXT} wrap="truncate-end">{run.id === MAIN ? 'this session' : run.description}</Text>
@@ -140,7 +140,7 @@ export const registerAgentsPane: Feature = (on, options) => {
           {ctx === null || Svg !== null ? null : <Text color={COLOR[run.status] ?? TEXT}>{bar(ctx.percent).on}</Text>}
           {ctx === null || Svg !== null ? null : <Text color={EMPTY}>{bar(ctx.percent).off}</Text>}
           {ctx === null || Svg === null ? null : (
-            <Svg source={capsule(ctx.percent, COLOR[run.status] ?? TEXT)} alt={`context ${ctx.percent}%`} {...CAPSULE_SIZE} />
+            <Svg source={capsule(ctx.percent, COLOR[run.status] ?? TEXT, `context ${ctx.isKnown ? '' : 'about '}${ctx.percent}% full`)} alt={`context ${ctx.percent}%`} {...CAPSULE_SIZE} />
           )}
           {ctx === null ? null : (
             <Text color={ctx.percent >= 90 ? WARN : DIM}>

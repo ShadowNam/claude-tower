@@ -6,7 +6,7 @@ import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
 import { readAgents, readBuilds, readTick, readUsage } from '../core/state'
 import { cacheView, TTL_MIN } from '../core/usage'
-import { BAD, BG, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
+import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
 import type { UsageWindow } from '../../types'
 
@@ -137,7 +137,7 @@ export const registerBand: Feature = (on, options) => {
             <Svg source={mark(ORANGE)} alt="Tower" {...MARK_SIZE} />
           </Box>
         )}
-        <Text color={TEXT} bold>USAGE</Text>
+        <Text color={TEXT} weight="bold">USAGE</Text>
       </Box>
     )
 
@@ -145,7 +145,7 @@ export const registerBand: Feature = (on, options) => {
       const p = partOf(w, now, cells)
       return (
         <Box key={`w${i}`} flexDirection="row" flexShrink={0} marginRight={3}>
-          <Text color={DIM} bold>{p.name} </Text>
+          <Text color={DIM} weight="bold">{p.name} </Text>
           {Svg === null ? (
             <>
               <Text color={p.color}>{p.on}</Text>
@@ -154,10 +154,10 @@ export const registerBand: Feature = (on, options) => {
           ) : (
             <Svg source={capsule(p.left, p.color)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
           )}
-          <Text color={p.color} bold> {p.left}% left</Text>
-          {p.isLow ? <Text backgroundColor={BAD} color={INK} bold>{' LOW '}</Text> : null}
+          <Text color={p.color} weight="bold" tabular> {p.left}% left</Text>
+          {p.isLow ? <Text backgroundColor={BAD} color={INK} weight="bold">{' LOW '}</Text> : null}
           {p.reset === '' ? null : <Text color={DIM}> · {p.reset}</Text>}
-          {p.empty === '' ? null : <Text color={WARN} bold> · out ~{p.empty}</Text>}
+          {p.empty === '' ? null : <Text color={WARN} weight="bold"> · out ~{p.empty}</Text>}
         </Box>
       )
     }
@@ -167,7 +167,7 @@ export const registerBand: Feature = (on, options) => {
       return (
         <Box key={`w${i}`} flexDirection="column" flexShrink={0} marginRight={3}>
           <Box flexDirection="row" alignItems="center">
-            <Text color={DIM} bold>{p.name} </Text>
+            <Text color={DIM} weight="bold">{p.name} </Text>
             {Svg === null ? (
               <>
                 <Text color={p.color}>{p.on}</Text>
@@ -178,11 +178,11 @@ export const registerBand: Feature = (on, options) => {
             )}
           </Box>
           <Box flexDirection="row">
-            <Text color={p.color} bold>{p.left}% left</Text>
-            {p.isLow ? <Text backgroundColor={BAD} color={INK} bold>{' LOW '}</Text> : null}
+            <Text color={p.color} weight="bold" tabular>{p.left}% left</Text>
+            {p.isLow ? <Text backgroundColor={BAD} color={INK} weight="bold">{' LOW '}</Text> : null}
           </Box>
           {p.reset === '' ? null : <Text color={DIM}>resets {p.reset}</Text>}
-          {p.empty === '' ? null : <Text color={WARN} bold>out ~{p.empty}</Text>}
+          {p.empty === '' ? null : <Text color={WARN} weight="bold">out ~{p.empty}</Text>}
         </Box>
       )
     }
@@ -193,9 +193,11 @@ export const registerBand: Feature = (on, options) => {
     const crew =
       busy && agents !== null ? (
         <Box key="crew" flexDirection="row" flexShrink={0} marginRight={3} alignItems="center">
-          {Svg === null ? null : <Svg source={orb(OK)} alt="warm" {...ORB_SIZE} />}
-          <Text color={OK} bold> {agents.running} running</Text>
-          {agents.failed > 0 ? <Text color={BAD} bold> · {agents.failed} failed</Text> : null}
+          {Svg === null ? null : (
+            <Svg source={orb(agents.failed > 0 ? BAD : OK, agents.failed > 0 ? 'alert' : 'round')} alt="running" {...ORB_SIZE} />
+          )}
+          <Text color={OK} weight="bold"> {agents.running} running</Text>
+          {agents.failed > 0 ? <Text color={BAD} weight="bold"> · {agents.failed} failed</Text> : null}
           <Text color={DIM}> · {agents.costUsd === null ? '$?' : usd(agents.costUsd)}</Text>
           <Text color={DIM}> /tower-agents</Text>
         </Box>
@@ -208,14 +210,14 @@ export const registerBand: Feature = (on, options) => {
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
             {Svg === null ? (
-              <Text backgroundColor={OK} color={INK} bold>{' WARM '}</Text>
+              <Text backgroundColor={OK} color={INK} weight="bold">{' WARM '}</Text>
             ) : (
               <Box flexDirection="row" alignItems="center">
                 <Svg source={orb(OK)} alt="warm" {...ORB_SIZE} />
-                <Text color={OK} bold> WARM</Text>
+                <Text color={OK} weight="bold"> WARM</Text>
               </Box>
             )}
-            <Text color={DIM}> {Math.max(0, TTL_MIN - view.idleMin)}m left</Text>
+            <Text color={DIM} tabular> {Math.max(0, TTL_MIN - view.idleMin)}m left</Text>
           </Box>
         )
       } else {
@@ -223,16 +225,16 @@ export const registerBand: Feature = (on, options) => {
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
             {Svg === null ? (
-              <Text backgroundColor={WARN} color={INK} bold>{' COLD '}</Text>
+              <Text backgroundColor={COLD} color={INK} weight="bold">{' COLD '}</Text>
             ) : (
               <Box flexDirection="row" alignItems="center">
-                <Svg source={orb(WARN)} alt="cold" {...ORB_SIZE} />
-                <Text color={WARN} bold> COLD</Text>
+                <Svg source={orb(COLD)} alt="cold" {...ORB_SIZE} />
+                <Text color={COLD} weight="bold"> COLD</Text>
               </Box>
             )}
-            <Text color={DIM}> {since(view.idleMs)} idle</Text>
+            <Text color={DIM} tabular> {since(view.idleMs)} idle</Text>
             <Text color={DIM}> · </Text>
-            <Text color={TEXT} bold>{cost === null ? '$?' : usd(cost)}</Text>
+            <Text color={TEXT} weight="bold" tabular>{cost === null ? '$?' : usd(cost)}</Text>
             <Text color={DIM}> to re-send</Text>
           </Box>
         )
@@ -245,7 +247,7 @@ export const registerBand: Feature = (on, options) => {
       (columns >= CTX_AT || bare) && u.ledger.window > 0 ? (
         <Box key="ctx" flexDirection="row" flexShrink={0} marginRight={3}>
           <Text color={DIM}>ctx </Text>
-          <Text color={TEXT}>{Math.round((u.ledger.tokens / u.ledger.window) * 100)}%</Text>
+          <Text color={TEXT} tabular>{Math.round((u.ledger.tokens / u.ledger.window) * 100)}%</Text>
           <Text color={DIM}> of {tokens(u.ledger.window)}</Text>
         </Box>
       ) : null
@@ -253,7 +255,7 @@ export const registerBand: Feature = (on, options) => {
     const cost =
       u.ledger.usd === null ? null : (
         <Box key="cost" flexDirection="row" flexShrink={0}>
-          <Text color={TEXT} bold>{usd(u.ledger.usd)}</Text>
+          <Text color={TEXT} weight="bold" tabular>{usd(u.ledger.usd)}</Text>
           <Text color={DIM}> session</Text>
         </Box>
       )
@@ -312,26 +314,26 @@ export const registerBand: Feature = (on, options) => {
       buildRows.push(
         <Box key="build" flexDirection="row" paddingX={1}>
           <Box flexShrink={0} marginRight={2}>
-            <Text color={TEXT} bold>BUILD</Text>
+            <Text color={TEXT} weight="bold">BUILD</Text>
           </Box>
           {b.state === 'running' ? (
             <Box flexDirection="row" flexShrink={0}>
               {bar === null ? null : <Text color={OK}>{bar.on}</Text>}
               {bar === null ? null : <Text color={EMPTY}>{bar.off}</Text>}
               {est.progress === null ? null : (
-                <Text color={OK} bold> {Math.round(est.progress * 100)}%</Text>
+                <Text color={OK} weight="bold"> {Math.round(est.progress * 100)}%</Text>
               )}
-              <Text color={est.stage === 'normal' ? TEXT : WARN} bold> {build.eta}</Text>
+              <Text color={est.stage === 'normal' ? TEXT : WARN} weight="bold"> {build.eta}</Text>
               <Text color={DIM}> {MARK[est.confidence] ?? ''} · {build.elapsed} elapsed</Text>
             </Box>
           ) : b.state === 'failed' ? (
             <Box flexDirection="row" flexShrink={0}>
-              <Text backgroundColor={BAD} color={INK} bold>{' ✗ failed '}</Text>
+              <Text backgroundColor={BAD} color={INK} weight="bold">{' ✗ failed '}</Text>
               <Text color={DIM}> after {build.elapsed} · {b.tool}</Text>
             </Box>
           ) : (
             <Box flexDirection="row" flexShrink={0}>
-              <Text backgroundColor={OK} color={INK} bold>{' ✓ built '}</Text>
+              <Text backgroundColor={OK} color={INK} weight="bold">{' ✓ built '}</Text>
               <Text color={DIM}> in {build.elapsed}</Text>
               {faster !== null && Math.abs(faster) > 2_000 ? (
                 <Text color={DIM}> · {since(Math.abs(faster))} {faster > 0 ? 'faster' : 'slower'} than usual</Text>

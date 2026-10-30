@@ -60,11 +60,11 @@ export const registerAgentsPane: Feature = (on, options) => {
 
     const header = (
       <Box key="head" flexDirection="row" paddingX={1}>
-        <Text color={OK} bold>{totals.running} running</Text>
+        <Text color={OK} weight="bold">{totals.running} running</Text>
         <Text color={DIM}> · {totals.done} done</Text>
-        {totals.failed > 0 ? <Text color={BAD} bold> · {totals.failed} failed</Text> : null}
+        {totals.failed > 0 ? <Text color={BAD} weight="bold"> · {totals.failed} failed</Text> : null}
         <Box flexGrow={1} />
-        <Text color={TEXT} bold>{totals.costUsd === null ? '$?' : usd(totals.costUsd)}</Text>
+        <Text color={TEXT} weight="bold">{totals.costUsd === null ? '$?' : usd(totals.costUsd)}</Text>
       </Box>
     )
 
@@ -123,7 +123,7 @@ export const registerAgentsPane: Feature = (on, options) => {
             <Text color={COLOR[run.status] ?? TEXT}>{GLYPH[run.status] ?? '●'} </Text>
           ) : (
             <Box marginRight={1}>
-              <Svg source={orb(COLOR[run.status] ?? TEXT)} alt={run.status} {...ORB_SIZE} />
+              <Svg source={orb(COLOR[run.status] ?? TEXT, run.status === 'failed' ? 'alert' : 'round')} alt={run.status} {...ORB_SIZE} />
             </Box>
           )}
           <Text color={TEXT} wrap="truncate-end">{run.id === MAIN ? 'this session' : run.description}</Text>

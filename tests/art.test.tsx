@@ -42,27 +42,84 @@ test('every drawing is bounded markup carrying no text and no script', async () 
   }
 })
 
-test('a capsule fills to the figure and never past its track', async () => {
-  // 84 wide at 2x, less a pixel of inset either side: 166 of travel.
-  expect(capsule(100, '#e8954a')).toContain('width="166.00"')
-  expect(capsule(50, '#e8954a')).toContain('width="83.00"')
-  // Out of scale, and not a number at all, both stop at the ends.
-  expect(capsule(140, '#e8954a')).toContain('width="166.00"')
-  // Nothing left means no bead at all: the channel alone, one rect.
-  expect(capsule(-20, '#e8954a').match(/<rect/g)?.length).toBe(1)
-  expect(capsule(Number.NaN, '#e8954a').match(/<rect/g)?.length).toBe(1)
-  // And a real reading draws the bead, its specular and its rim.
-  expect(capsule(50, '#e8954a').match(/<rect/g)?.length).toBe(4)
+test('a capsule stays linear all the way down, not just above 12%', async () => {
+  // The travel is the track less a unit of inset either side.
+  const widthOf = (svg: string) => Number(/width="([\d.]+)" height="16" fill="url\(#\w+b\)"/.exec(svg)?.[1] ?? -1)
+
+  expect(widthOf(capsule(100, '#e8893c'))).toBe(164)
+  expect(widthOf(capsule(50, '#e8893c'))).toBe(82)
+
+  // The reason for the square-ended fill clipped to a rounded track: a rounded
+  // fill shorter than its own corner diameter stops encoding the value. These
+  // four used to land on the same lens shape; now each is its own length.
+  const low = [8, 5, 3, 1].map(p => widthOf(capsule(p, '#e8893c')))
+  expect(low).toEqual([13.12, 8.2, 4.92, 1.64])
+  // Strictly decreasing, which is the whole claim.
+  expect(low.every((w, i) => i === 0 || w < (low[i - 1] as number))).toBe(true)
+})
+
+test('the empty track is visible, so the scale can be read', async () => {
+  // Without a rim the track sits at 1.17:1 on the band and a low reading is a
+  // nub floating in nothing. EMPTY is 1.77:1 and is what the rim is drawn in.
+  const svg = capsule(8, '#e8893c')
+  expect(svg).toContain('stroke="#4a463f"')
+  expect(svg).toContain('stroke-width="2"')
+  // Inset by half the stroke, since SVG strokes straddle the path.
+  expect(svg).toContain('x="3" y="7" width="162" height="14"')
+})
+
+test("a drawing carries its own floor rather than borrowing the band's", async () => {
+  // Alpha over whatever is behind inverts the moment something else is behind
+  // it. The floor is opaque, derived from BG.
+  const svg = capsule(50, '#e8893c')
+  const floor = /<linearGradient id="\w+f"[\s\S]*?<\/linearGradient>/.exec(svg)?.[0] ?? ''
+  expect(floor).not.toContain('stop-opacity')
+  expect(/stop-color="#[0-9a-f]{6}"/.test(floor)).toBe(true)
+})
+
+test('the lit face is darker at its very top than just below it', async () => {
+  // The one thing that separates a modelled surface from a cheap gradient: the
+  // topmost sliver is the edge rolling away from the light.
+  const svg = capsule(60, '#e8893c')
+  const body = /<linearGradient id="\w+b"[\s\S]*?<\/linearGradient>/.exec(svg)?.[0] ?? ''
+  const lum = (h: string) => {
+    const n = parseInt(h.slice(1), 16)
+    return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)
+  }
+  const stops = [...body.matchAll(/offset="([\d.]+)" stop-color="(#[0-9a-f]{6})"/g)]
+  expect(stops.length).toBe(5)
+  const lip = lum(stops[0]![2] as string)
+  const specular = lum(stops[1]![2] as string)
+  expect(lip < specular).toBe(true)
+})
+
+test('no feature is thinner than one device pixel at 1x', async () => {
+  // Authored at 2x, shown at 1x: a 1-unit line is half a pixel, which renders
+  // as mud rather than as a faint line.
+  for (const svg of [capsule(62, '#e8893c'), orb('#86c06a'), orb('#e8635a', 'alert'), mark('#e8893c')]) {
+    for (const [, w] of svg.matchAll(/<rect[^>]*?width="([\d.]+)"/g)) {
+      expect(Number(w) >= 2 || Number(w) === 1).toBe(true) // 1 only inside the dither pattern
+    }
+    for (const [, sw] of svg.matchAll(/stroke-width="([\d.]+)"/g)) {
+      expect(Number(sw) >= 2).toBe(true)
+    }
+  }
+})
+
+test('the failure state has a silhouette, not only a colour', async () => {
+  // Green and red are the one pair no hex separates for a deuteranope, so the
+  // distinction cannot rest on hue at eleven pixels.
+  expect(orb('#86c06a')).toContain('<circle')
+  expect(orb('#e8635a', 'alert')).toContain('<path d="M11 3L19 11L11 19L3 11Z"')
+  expect(orb('#e8635a', 'alert')).not.toContain('r="8"')
 })
 
 test('a colour that is not a colour cannot become markup', async () => {
-  // Only ever three integers reach the file, whatever was handed in.
   const hostile = capsule(50, 'red; }</style><script>alert(1)</script>')
   expect(hostile).not.toContain('<script')
   expect(hostile).not.toContain('</style>')
-  expect(hostile).toContain('rgb(136,136,136)')
-  expect(capsule(50, '#e84')).toContain('rgb(238,136,68)')
-  expect(mark('#e8954a')).toContain('rgb(')
+  expect(hostile).toContain('#888888')
+  expect(capsule(50, '#e83')).toContain('#ee8833')
 })
 
 test('two drawings in one row never share a gradient id', async () => {
@@ -117,6 +174,11 @@ test('every drawing on the band says what it is', async ($, on) => {
   // The mark, and a capsule for each window.
   expect(drawings.length).toBe(3)
   expect(drawings.every(says)).toBe(true)
+  // An alt is only useful if it describes its own drawing. A bulk edit once
+  // left the running-agents orb saying "warm", which a presence check missed.
+  const alts = drawings.map(altOf)
+  expect(alts).toContain('Tower')
+  expect(alts.filter(a => typeof a === 'string' && a.endsWith('% left')).length).toBe(2)
   await ui.unmount()
 })
 

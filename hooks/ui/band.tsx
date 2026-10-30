@@ -107,7 +107,16 @@ export const registerBand: Feature = (on, options) => {
     const plan = wantsUsage ? await readPlan($) : null
     // A press outranks the setting; reading it here also makes this drawing a
     // reader of it, so the next press redraws the band.
-    const picked = await readPicked($)
+    //
+    // Caught, because this read decides a layout and nothing more — and a
+    // render that throws takes the whole band with it. No single figure is
+    // worth the row it is drawn on.
+    let picked = ''
+    try {
+      picked = await readPicked($)
+    } catch {
+      // The setting decides, which is what it did before this existed.
+    }
     const builds = wantsBuilds ? await readBuilds($) : []
     const head = headlineOf(builds, now)
     const build = head === null ? null : viewOf(head, now)

@@ -1,12 +1,12 @@
 import { PANE, totalsOf } from '../core/agents'
 import { headlineOf, othersOf, viewOf } from '../core/builds'
-import { at, dots, since, tokens, until, usd } from '../core/fmt'
+import { at, dots, reasonOf, since, tokens, until, usd } from '../core/fmt'
 import { CAPSULE_SIZE, capsule, DIAL_SIZE, dial, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
 import { heaviestOf } from '../core/engine'
 import { FAULT_MS, faultWord } from '../core/shape'
-import { readAgents, readBuilds, readEdits, readPicked, readPlan, readShape, readTick, readUsage, writePicked } from '../core/state'
+import { readAgents, readBuilds, readEdits, readPlan, readShape, readTick, readUsage } from '../core/state'
 import { cacheView, headroom, heroOf, layoutOf, nextLayout, TTL_MIN } from '../core/usage'
 import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, PANEL, TEXT, WARN, YELLOW } from './theme'
 
@@ -105,18 +105,6 @@ export const registerBand: Feature = (on, options) => {
       shape?.fault != null && now - shape.fault.at < FAULT_MS ? faultWord(shape.fault.kind) : null
 
     const plan = wantsUsage ? await readPlan($) : null
-    // A press outranks the setting; reading it here also makes this drawing a
-    // reader of it, so the next press redraws the band.
-    //
-    // Caught, because this read decides a layout and nothing more — and a
-    // render that throws takes the whole band with it. No single figure is
-    // worth the row it is drawn on.
-    let picked = ''
-    try {
-      picked = await readPicked($)
-    } catch {
-      // The setting decides, which is what it did before this existed.
-    }
     const builds = wantsBuilds ? await readBuilds($) : []
     const head = headlineOf(builds, now)
     const build = head === null ? null : viewOf(head, now)
@@ -167,17 +155,6 @@ export const registerBand: Feature = (on, options) => {
     const isStacked = !isWide && columns >= STACKED_AT
     const cells = isWide || isStacked ? CELLS : TIGHT_CELLS
 
-    // Decided here rather than further down, because the label draws the name
-    // and a const used above its declaration throws at render — which fails
-    // the hook, which empties the whole band.
-    const chosen = picked === '' ? layout : layoutOf(picked)
-    const form: ReturnType<typeof layoutOf> = Svg === null ? 'rows' : chosen
-
-    // Shaped exactly as the version that last drew: a Box holding the mark
-    // and one Button, and nothing else. Adding a sibling Text here is the only
-    // change this band has ever made that emptied it on the real surface while
-    // every test and the validator passed — so the layout's name goes in the
-    // label rather than in an element of its own.
     const label = (
       <Box key="label" flexShrink={0} flexDirection="row" alignItems="center" gap={1}>
         {Svg === null ? null : (
@@ -185,21 +162,21 @@ export const registerBand: Feature = (on, options) => {
             <Svg source={mark(ORANGE)} alt="Tower" {...MARK_SIZE} />
           </Box>
         )}
-        <Button
-          key="cycle"
-          label={`USAGE ${form}`}
-          plain
-          dimColor
-          hotkey="2"
-          onPress={() => {
-            // State and the store, not config: a config row that is not this
-            // plugin's to write answers `{ deny }` rather than throwing, so a
-            // press that ignored the answer looked exactly like a dead button.
-            const after = nextLayout(chosen)
-            void writePicked($, after)
-            void $.store.set('layout', after)
-          }}
-        />
+        <Button key="cycle" label="USAGE" plain dimColor hotkey="2" onPress={() => {
+            // config.set answers `{ deny }` rather than throwing when a row is
+            // not this plugin's to write, so the refusal is surfaced instead of
+            // being dropped — a silent deny is indistinguishable from a button
+            // that does nothing, which is exactly how this looked for hours.
+            void (async () => {
+              try {
+                const answer = await $.config.set({ key: 'bandLayout', value: nextLayout(layout) })
+                const why = (answer as { deny?: unknown } | null)?.deny
+                if (why !== undefined) $.ui.toast(`Tower cannot change its own layout: ${String(why)}`)
+              } catch (err) {
+                $.ui.toast(`Tower could not change the layout: ${reasonOf(err, 120)}`)
+              }
+            })()
+          }} />
       </Box>
     )
 
@@ -347,6 +324,7 @@ export const registerBand: Feature = (on, options) => {
     // own panel is narrower than the threshold that was written for a
     // full-width terminal. A layout is a choice; a narrow panel is a reason to
     // wrap, not a reason to override one.
+    const form: ReturnType<typeof layoutOf> = Svg === null ? 'rows' : layout
     const hero = form === 'hero' ? heroOf(windowList, now) : null
 
     const windows =

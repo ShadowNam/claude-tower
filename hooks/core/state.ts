@@ -129,21 +129,3 @@ export function readPlan($: EngineInterface): Promise<Plan | null> {
 export async function writePlan($: EngineInterface, fn: (prev: Plan | null) => Plan | null): Promise<void> {
   await update($, plan, fn)
 }
-
-/**
- * A layout chosen by pressing the band, which outranks the setting.
- *
- * The press used to call `$.config.set`, which answers `{ deny }` rather than
- * throwing when a row is not the plugin's to write — and the press ignored the
- * answer, so a refusal looked exactly like a button that did nothing. State
- * cannot be refused, and the store carries the choice to the next session.
- */
-const picked = atom({ plugin: 'tower', key: 'picked' } as const, '')
-
-export function readPicked($: EngineInterface): Promise<string> {
-  return read($, picked)
-}
-
-export async function writePicked($: EngineInterface, value: string): Promise<void> {
-  await update($, picked, () => value)
-}

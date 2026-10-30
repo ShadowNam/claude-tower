@@ -120,8 +120,8 @@ test('a switched-off band draws nothing at all', { options: { usageBand: false }
   await ui.unmount()
 })
 
-test('the band names the layout it is drawing, and cycles on a press', async ($, on) => {
-  const kept: Record<string, unknown> = {}
+test('a layout change that does not land says so, rather than looking dead', async ($, on) => {
+  const said: string[] = []
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.version', () => ({ value: { version: '2.1.309', base: 'test', builtAt: '' } }))
   on('session.model', () => ({ value: 'claude-opus-5' }))
@@ -129,10 +129,12 @@ test('the band names the layout it is drawing, and cycles on a press', async ($,
   on('command.register', () => ({ value: { command: 'tower' } }))
   on('clock.now', () => ({ value: NOW }))
   on('clock.every', () => ({ value: {} }))
-  on('store.get', (_, e) => ({ value: kept[String((e as { key?: unknown }).key)] ?? null }))
-  on('store.set', (_, e) => {
-    const row = e as { key: string; value: unknown }
-    kept[row.key] = row.value
+  // config.set is deliberately left unstubbed: the harness models it as
+  // returning the row's scalar value and has no way to express a `{ deny }`,
+  // so the refusal path cannot be reached from a test. What can be tested is
+  // the guarantee that matters — that a press which does not land says so.
+  on('ui.toast', (_, e) => {
+    said.push(String((e as { text?: unknown }).text ?? ''))
     return { value: undefined }
   })
   on('ui.render', ($, e) => {
@@ -143,21 +145,13 @@ test('the band names the layout it is drawing, and cycles on a press', async ($,
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
-  // The control is the band's own label, so it costs no columns of its own,
-  // and the layout it is drawing is written beside it.
-  expect((await ui.find({ type: 'Button', label: /^USAGE / })) !== undefined).toBe(true)
-  expect((await ui.find({ type: 'Button', label: 'USAGE dials' })) !== undefined).toBe(true)
+  expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
 
-  // A press writes state, so the band redraws, and the store, so the choice
-  // outlives the session. It used to call config.set, which answers { deny }
-  // rather than throwing when the row is not the plugin's to write — and the
-  // press ignored the answer, so a refusal looked like a dead button.
+  // A deny that is thrown away is indistinguishable from a button that does
+  // nothing, which is exactly how this looked while it was being debugged.
   await ui.press({ key: 'cycle' })
-  expect(kept['layout']).toBe('hero')
-  expect((await ui.find({ type: 'Button', label: 'USAGE hero' })) !== undefined).toBe(true)
-
-  await ui.press({ key: 'cycle' })
-  expect(kept['layout']).toBe('cards')
+  expect(said.length).toBe(1)
+  expect(said[0]).toContain('could not change the layout')
   await ui.unmount()
 })
 

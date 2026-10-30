@@ -5,7 +5,7 @@ import type { Feature, Options } from './kinds'
 import { readDiag, writeDiag } from './state'
 
 /** Must match the version in .claude-plugin/plugin.json. */
-const VERSION = '3.1.3'
+const VERSION = '3.1.4'
 
 /**
  * Seeds what `/tower` reports. Called from the mod's one session.start hook:

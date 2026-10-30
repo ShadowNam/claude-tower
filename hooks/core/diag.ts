@@ -5,7 +5,7 @@ import type { Feature, Options } from './kinds'
 import { readDiag, writeDiag } from './state'
 
 /** Must match the version in .claude-plugin/plugin.json. */
-const VERSION = '3.0.1'
+const VERSION = '3.0.2'
 
 /**
  * Seeds what `/tower` reports. Called from the mod's one session.start hook:
@@ -87,7 +87,12 @@ export const registerDiag: Feature = (on, options) => {
           ? ['', `  ${failures.length} feature${failures.length === 1 ? '' : 's'} did not start:`, ...failures.map(f => `    ✗ ${f}`)]
           : []),
         '',
-        'Change any of these in /config, under Tower.',
+        d.surface === 'desktop'
+          ? 'Change these from the + beside the prompt box, then Plugins. /config opens a'
+          : 'Change these with /plugin configure tower@tower, or from a shell with',
+        d.surface === 'desktop'
+          ? 'terminal panel the desktop app cannot show.'
+          : 'claude plugin configure tower@tower --values-stdin.',
       ].join('\n'),
     }
   })

@@ -304,3 +304,32 @@ test('an unknown layout falls back rather than drawing nothing', async () => {
   expect(layoutOf(undefined)).toBe('dials')
   expect(layoutOf(7)).toBe('dials')
 })
+
+test('a narrow panel wraps the band, it does not override the layout', async ($, on) => {
+  // This was the bug: the width gate forced `rows` below 110 columns, so a
+  // layout chosen in the settings never appeared at all — the band's own panel
+  // is narrower than a threshold written for a full-width terminal.
+  SEED(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+  for (const bodyColumns of [60, 90, 140]) {
+    const ui = await $.ui.mount({
+      ...BAND,
+      surface: 'desktop',
+      props: { ...BAND.props, bodyColumns },
+    })
+    // The mark and one dial per window, at every width.
+    expect((await ui.findAll({ type: 'Svg' })).length).toBe(3)
+    await ui.unmount()
+  }
+})
+
+test('the terminal is the one surface a layout cannot override', async ($, on) => {
+  SEED(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect((await ui.findAll({ type: 'Svg' })).length).toBe(0)
+  expect((await ui.find({ type: 'Text', text: /69% left/ })) !== undefined).toBe(true)
+  await ui.unmount()
+})

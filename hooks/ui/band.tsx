@@ -304,9 +304,13 @@ export const registerBand: Feature = (on, options) => {
       )
     }
 
-    // The terminal always gets rows: it can draw neither a dial nor a tile,
-    // and an arc made of text is a worse bar rather than a dial.
-    const form: ReturnType<typeof layoutOf> = Svg === null || !isWide ? 'rows' : layout
+    // The terminal gets rows, having no way to draw a dial or a tile. Width
+    // does NOT decide this any more: it used to, and the result was that a
+    // layout chosen in the settings simply never appeared, because the band's
+    // own panel is narrower than the threshold that was written for a
+    // full-width terminal. A layout is a choice; a narrow panel is a reason to
+    // wrap, not a reason to override one.
+    const form: ReturnType<typeof layoutOf> = Svg === null ? 'rows' : layout
     const hero = form === 'hero' ? heroOf(windowList, now) : null
 
     const windows =
@@ -513,7 +517,7 @@ export const registerBand: Feature = (on, options) => {
       )
 
     const row = (
-      <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center">
+      <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center" flexWrap="wrap">
         {alarm}
         {compacting}
         {slowChip}
@@ -564,11 +568,11 @@ export const registerBand: Feature = (on, options) => {
       isWide || isStacked || bare
         ? [row]
         : [
-            <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center">
+            <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center" flexWrap="wrap">
               {label}
               {windows}
             </Box>,
-            <Box key="tail" flexDirection="row" paddingX={1} gap={3} alignItems="center">
+            <Box key="tail" flexDirection="row" paddingX={1} gap={3} alignItems="center" flexWrap="wrap">
                     {crew}
               {cache}
               {cost}

@@ -106,6 +106,8 @@ export type Edits = {
   files: readonly string[]
   added: number
   removed: number
+  /** The most recent edit as a diff hunk; only the last one is kept. */
+  last?: string
 }
 
 /** A turn that ended badly, as the engine named it. */
@@ -127,6 +129,23 @@ export type Background = {
   scheduled: number
   /** When the list was taken; it is a turn-boundary snapshot, not live. */
   at: number
+}
+
+/**
+ * The repository the session is working in.
+ *
+ * `sync` is deliberately coarse. Ahead/behind counts need the commit graph,
+ * which is not reachable from reading `.git` files, so this says whether the
+ * local and remote refs match and never a number.
+ */
+export type Repo = {
+  branch: string
+  isDetached: boolean
+  /** main, master, production, a release branch: a stray commit matters more. */
+  isProtected: boolean
+  /** rebasing, merging, cherry-picking, and the rest; null when the tree is settled. */
+  midway: string | null
+  sync: 'synced' | 'diverged' | 'unknown'
 }
 
 /** The heaviest thing in the context that is not the conversation. */
@@ -160,6 +179,8 @@ export type Shape = {
   phase?: Phase
   /** Null when nothing is in flight; a snapshot taken at a turn boundary. */
   background?: Background | null
+  /** Null outside a repository, or before the first read. */
+  repo?: Repo | null
   /** The effort the turn ran at, after any silent downgrade. */
   effort: string
   /** Set while a compaction is running, or expected. */
@@ -210,6 +231,11 @@ export type AgentRun = {
   toolErrors: number
   /** Summed tool execution time, as the engine reports it per call. */
   toolMs: number
+  /**
+   * True for a run the engine listed that Tower never saw start — its figures
+   * are absent rather than zero, and a drawing must not read them as real.
+   */
+  isUnwatched?: boolean
   /** What the last finished tool took, for the row to name. */
   lastToolMs?: number
   /** Distinct files read or written, newest last, capped. */

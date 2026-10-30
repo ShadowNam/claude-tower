@@ -1,7 +1,7 @@
 import { MAIN, PANE, runModel, STUCK_MS, totalsOf, tree } from '../core/agents'
 import { since, tokens, usd } from '../core/fmt'
 import type { Feature } from '../core/kinds'
-import { readAgents, readPanel, readTick, readUsage, writePanel } from '../core/state'
+import { readAgents, readEdits, readPanel, readTick, readUsage, writePanel } from '../core/state'
 import { CAPSULE_SIZE, capsule, ORB_SIZE, orb } from './art'
 import { BAD, DIM, EMPTY, OK, TEXT, WARN } from './theme'
 
@@ -41,8 +41,9 @@ export const registerAgentsPane: Feature = (on, options) => {
     const usage = await readUsage($)
     const now = await $.clock.now()
 
+    const edits = await readEdits($)
     const ui = $.ui.resolve(e)
-    const { Box, Button, Text } = ui
+    const { Box, Button, Code, Text } = ui
     // The terminal's table still lists Svg, so ask the surface, not the table.
     const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
     const totals = totalsOf(list, now)
@@ -147,7 +148,11 @@ export const registerAgentsPane: Feature = (on, options) => {
               {' '}ctx {ctx.isKnown ? '' : '~'}{ctx.percent}%
             </Text>
           )}
-          <Text color={DIM}> · {run.costUsd === null ? '$?' : usd(run.costUsd)} · {elapsed}</Text>
+          {run.isUnwatched === true ? (
+            <Text color={DIM}> · started before this panel</Text>
+          ) : (
+            <Text color={DIM}> · {run.costUsd === null ? '$?' : usd(run.costUsd)} · {elapsed}</Text>
+          )}
           {run.toolMs > 0 ? <Text color={DIM} tabular> · {since(run.toolMs)} in tools</Text> : null}
           {run.toolErrors > 0 ? <Text color={BAD}> · {run.toolErrors} tool errors</Text> : null}
         </Box>
@@ -190,6 +195,16 @@ export const registerAgentsPane: Feature = (on, options) => {
         <Box key="rows" flexDirection="column" paddingX={1}>
           {shown.flatMap((r, i) => draw(r.run, r.depth, i))}
         </Box>
+        {edits.last === undefined || panel.isCompact ? null : (
+          <Box key="diff" flexDirection="column" paddingX={1} marginTop={1}>
+            <Text color={DIM}>
+              last edit · {edits.files.length} {edits.files.length === 1 ? 'file' : 'files'} this session
+            </Text>
+            {/* The engine's own highlighter, so a diff looks like every other
+                diff in the app rather than like one mod's idea of one. */}
+            <Code source={edits.last} format="diff" wrap="truncate-end" />
+          </Box>
+        )}
         {controls}
       </Box>
     )

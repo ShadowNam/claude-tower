@@ -57,6 +57,36 @@ export function changeOf(
   return { path, added: lines(after), removed: lines(before) }
 }
 
+/** How many lines of an edit are worth keeping to show. */
+const HUNK_MAX = 14
+
+/**
+ * The last edit as a unified-diff hunk, for `Code` to colour with the engine's
+ * own highlighter.
+ *
+ * Only the most recent one is kept. A real diff of the session would mean
+ * holding every edit's before and after in session state, which grows without
+ * bound in exactly the sessions that edit most; and the useful question at a
+ * glance is "what did it just change", not "what has it changed all day".
+ *
+ * `@@` carries no line numbers because nothing in the call says where in the
+ * file the text sat. A fabricated range would be worse than an honest `@@`.
+ */
+export function hunkOf(path: string, before: string, after: string): string {
+  const name = path.replace(/^.*[\\/]/, '')
+  const cut = (text: string, mark: string): string[] =>
+    text === '' ? [] : text.split('\n').slice(0, HUNK_MAX).map(l => mark + l)
+  const trimmed = before.split('\n').length > HUNK_MAX || after.split('\n').length > HUNK_MAX
+  return [
+    `--- a/${name}`,
+    `+++ b/${name}`,
+    '@@',
+    ...cut(before, '-'),
+    ...cut(after, '+'),
+    ...(trimmed ? ['\\ truncated'] : []),
+  ].join('\n')
+}
+
 /** The fold, pure so the arithmetic can be tested without an engine. */
 export function fold(prev: Edits, change: { path: string; added: number; removed: number }): Edits {
   const files = prev.files.includes(change.path) ? prev.files : [...prev.files, change.path]
@@ -78,5 +108,13 @@ export async function noteEdit(
 ): Promise<void> {
   const change = changeOf(tool, input)
   if (change === null) return
-  await writeEdits($, prev => fold(prev, change))
+  const before = typeof input['old_string'] === 'string' ? input['old_string'] : ''
+  const after =
+    typeof input['new_string'] === 'string'
+      ? input['new_string']
+      : typeof input['content'] === 'string'
+        ? input['content']
+        : ''
+  const last = after === '' && before === '' ? undefined : hunkOf(change.path, before, after)
+  await writeEdits($, prev => ({ ...fold(prev, change), last }))
 }

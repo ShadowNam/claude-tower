@@ -66,7 +66,19 @@ export async function startAgents($: EngineInterface): Promise<void> {
     name: 'tower-agents',
     description: 'Open or close the agents panel.',
   })
+
+  // The engine's roster is the only way to learn about a loop that was already
+  // running when the mod loaded — after a hot reload, or a resumed session.
+  await syncAgents($, now)
+  $.clock.every(SYNC_MS, () => {
+    void (async () => {
+      await syncAgents($, await $.clock.now())
+    })()
+  })
 }
+
+/** How often the roster is reconciled. Slow: it only catches what was missed. */
+const SYNC_MS = 60_000
 
 /** A row of the panel: a run and how deep in the spawn tree it sits. */
 export type Row = { run: AgentRun; depth: number }
@@ -378,4 +390,68 @@ export async function noteToolTime($: EngineInterface, agentId: string | undefin
   await writeAgents($, prev =>
     prev.map(a => (a.id === id || a.agentId === id ? { ...a, toolMs: a.toolMs + ms, lastToolMs: ms } : a)),
   )
+}
+
+/**
+ * Reconciles Tower's roster against the engine's own.
+ *
+ * Tower builds its list by watching `agent.spawn`, so it misses any loop that
+ * was already running when the mod loaded — after a hot reload, or a session
+ * resumed with work in flight. The engine's list is authoritative for *which*
+ * runs exist; Tower's is richer about each one, carrying the tool, the context
+ * and the cost that the engine's roster has no room for.
+ *
+ * So this only adds what is missing and corrects a status, and never
+ * overwrites a run Tower has been watching. A row with nothing behind it is
+ * marked so the drawing can keep it quiet rather than claim figures it does
+ * not have.
+ */
+export async function syncAgents($: EngineInterface, now: number): Promise<void> {
+  let live: readonly { id: string; description?: string; type?: string; status?: string }[] = []
+  try {
+    live = (await $.agent.list()) as typeof live
+  } catch {
+    // No roster is no reason to drop the one being watched.
+    return
+  }
+  if (live.length === 0) return
+
+  const seen = new Map<string, string>()
+  for (const a of live) {
+    if (typeof a?.id === 'string' && a.id !== '') seen.set(a.id, String(a.status ?? ''))
+  }
+
+  await writeAgents($, prev => {
+    const known = new Set<string>()
+    for (const a of prev) {
+      known.add(a.id)
+      if (a.agentId !== undefined) known.add(a.agentId)
+    }
+
+    const added: AgentRun[] = []
+    for (const a of live) {
+      if (typeof a?.id !== 'string' || a.id === '' || known.has(a.id)) continue
+      added.push({
+        ...blank(a.id, now),
+        agentId: a.id,
+        type: String(a.type ?? 'agent'),
+        description: String(a.description ?? 'already running'),
+        status: a.status === 'completed' ? 'done' : a.status === 'failed' ? 'failed' : 'running',
+        // Nothing was watched, so its figures are absent rather than zero.
+        costUsd: null,
+        isUnwatched: true,
+      })
+    }
+
+    // A run the engine says has finished, which Tower never saw finish.
+    const settled = prev.map(a => {
+      const status = seen.get(a.agentId ?? a.id)
+      if (a.status !== 'running' || status === undefined) return a
+      if (status === 'completed') return { ...a, status: 'done' as const, endedAt: a.endedAt ?? now }
+      if (status === 'failed' || status === 'killed') return { ...a, status: 'failed' as const, endedAt: a.endedAt ?? now }
+      return a
+    })
+
+    return added.length === 0 ? settled : [...settled, ...added]
+  })
 }

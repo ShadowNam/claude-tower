@@ -1,7 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import { sweepStale } from '../hooks/core/builds'
-import { changeOf, fold as foldEdit, isWriter } from '../hooks/core/edits'
+import { changeOf, fold as foldEdit, hunkOf, isWriter } from '../hooks/core/edits'
+import { branchOf, gitDirOf, isProtected } from '../hooks/core/git'
 import { buildOf } from '../hooks/core/marker'
 import { effortOf, faultWord } from '../hooks/core/shape'
 
@@ -115,4 +116,63 @@ test('an effort is a level the engine named, or nothing', async () => {
   expect(effortOf('turbo')).toBe('')
   expect(effortOf(undefined)).toBe('')
   expect(effortOf(Number.NaN)).toBe('')
+})
+
+test('a branch is read from HEAD, and a detached head says so', async () => {
+  expect(branchOf('ref: refs/heads/main\n')).toEqual({ name: 'main', isDetached: false })
+  expect(branchOf('ref: refs/heads/feat/tower-band\n'))
+    .toEqual({ name: 'feat/tower-band', isDetached: false })
+
+  // A bare SHA is a detached head, which is worth saying in itself.
+  expect(branchOf('9f1c2ab3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9'))
+    .toEqual({ name: '9f1c2ab', isDetached: true })
+
+  expect(branchOf('')).toBe(null)
+  expect(branchOf('something else entirely')).toBe(null)
+})
+
+test('a worktree keeps its git directory somewhere else', async () => {
+  // In a linked worktree `.git` is a file naming the real directory — which is
+  // the common case for a session the app started for a task.
+  expect(gitDirOf('/repo', 'gitdir: /repo/.git/worktrees/tower\n'))
+    .toBe('/repo/.git/worktrees/tower')
+  // An ordinary checkout has a directory, and reading it fails harmlessly.
+  expect(gitDirOf('/repo', null)).toBe('/repo/.git')
+  expect(gitDirOf('/repo', 'not a gitdir line')).toBe('/repo/.git')
+})
+
+test('a branch where a stray commit matters is marked', async () => {
+  for (const name of ['main', 'master', 'production', 'prod', 'release/2.4', 'MAIN']) {
+    expect(isProtected(name)).toBe(true)
+  }
+  for (const name of ['feat/x', 'fix', 'mainline', 'release-notes']) {
+    expect(isProtected(name)).toBe(false)
+  }
+})
+
+test('the last edit becomes a hunk the engine can colour', async () => {
+  const hunk = hunkOf('/src/lib/cart.ts', 'const a = 1', 'const a = 2')
+  expect(hunk.split('\n')).toEqual([
+    '--- a/cart.ts',
+    '+++ b/cart.ts',
+    '@@',
+    '-const a = 1',
+    '+const a = 2',
+  ])
+
+  // A Write has nothing before it, so the body is all additions. The `--- a/`
+  // header carries hyphens of its own, so only the body is checked.
+  const written = hunkOf('/src/new.ts', '', 'one\ntwo').split('\n').slice(3)
+  expect(written).toEqual(['+one', '+two'])
+
+  // A long edit is cut and says so, rather than filling the panel.
+  const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n')
+  const cut = hunkOf('/a.ts', long, long)
+  expect(cut).toContain('\\ truncated')
+  expect(cut.split('\n').length).toBeLessThan(40)
+
+  // Windows paths are paths too — and the separators have to survive being
+  // written down, which is its own trap in a JavaScript string.
+  expect(hunkOf('C:\\src\\app\\main.ts', 'a', 'b')).toContain('--- a/main.ts')
+  expect(hunkOf('/home/me/src/main.ts', 'a', 'b')).toContain('--- a/main.ts')
 })

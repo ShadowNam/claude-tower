@@ -1,6 +1,7 @@
 import { startAgents } from './agents'
 import { noteFailures, startDiag } from './diag'
 import { reasonOf } from './fmt'
+import { startGit } from './git'
 import type { Feature } from './kinds'
 import { startUsage } from './usage'
 import { startWatch } from './watch'
@@ -36,6 +37,14 @@ export const registerBoot: Feature = (on, options) => {
         await startUsage($)
       } catch (err) {
         failed.push(`usage: ${reasonOf(err, 300)}`)
+      }
+    }
+
+    if (options.usageBand === true) {
+      try {
+        await startGit($)
+      } catch (err) {
+        failed.push(`git: ${reasonOf(err, 300)}`)
       }
     }
 

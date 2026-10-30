@@ -361,6 +361,25 @@ export const registerBand: Feature = (on, options) => {
         </Box>
       )
 
+    const repo = shape?.repo ?? null
+    const repoChip =
+      repo === null ? null : (
+        <Box key="repo" flexDirection="row" flexShrink={0} alignItems="center">
+          {repo.midway === null ? null : (
+            <Text backgroundColor={WARN} color={INK} weight="bold">{` ${repo.midway.toUpperCase()} `}</Text>
+          )}
+          <Text
+            color={repo.midway !== null ? WARN : repo.isProtected ? YELLOW : DIM}
+            weight={repo.isProtected || repo.midway !== null ? 'bold' : 'regular'}
+            wrap="truncate-end"
+          >
+            {repo.midway === null ? '' : ' '}
+            {repo.isDetached ? `detached ${repo.branch}` : repo.branch}
+          </Text>
+          {repo.sync === 'diverged' ? <Text color={DIM}> ↕</Text> : null}
+        </Box>
+      )
+
     const phaseChip =
       shape?.phase === undefined || !busy ? null : (
         <Box key="phase" flexShrink={0}>
@@ -413,6 +432,7 @@ export const registerBand: Feature = (on, options) => {
         {editChip}
         {bgChip}
         {cost}
+        {repoChip}
         {effortChip}
         {phaseChip}
         {waiting}

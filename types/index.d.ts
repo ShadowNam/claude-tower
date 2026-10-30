@@ -12,6 +12,12 @@ export type Diag = {
   reloads: number
   /** The panels switched on in the config, in display order. */
   panels: readonly string[]
+  /**
+   * Features that threw while starting, as `name: reason`. A feature that
+   * fails is skipped alone and named here, so `/tower` can say why a panel is
+   * missing rather than the mod going quietly dark.
+   */
+  failures: readonly string[]
 }
 
 /** One reading of a usage window, kept so a rate can be worked out from them. */

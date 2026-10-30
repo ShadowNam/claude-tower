@@ -76,11 +76,30 @@ Changing any of these reloads the mod with the new values. Nothing has to be res
 
 ## Commands
 
-- `/tower` — what loaded, what is switched on, where it draws
+- `/tower` — what loaded, what is switched on, where it draws, and anything that
+  failed to start
 - `/tower-agents` — open or close the agents panel
 - `/tower-tank` — open or close the Tank panel
 - `/tower-hook` — print the snippet that lets a build script report its own progress
 - `/tower-notify` — what would be sent; `/tower-notify test` sends the first message
+
+## If you see nothing
+
+Run `/tower`. It answers even when every other part of the mod has failed,
+because the diagnostics are seeded before anything else starts.
+
+- **`/tower` is an unknown command** — the mod is not loaded. Check it is enabled,
+  and remember that a change made with `claude plugin configure` from a shell only
+  takes effect the next time the app starts.
+- **`/tower` answers and lists failures** — that feature is the one to look at; the
+  rest of the mod carries on without it.
+- **`/tower` answers, nothing is listed, and the band says `windows not measured
+  yet`** — the mod is fine and waiting. The engine hands over the context a session
+  is carrying at startup but the rate-limit windows only on a later measurement, so
+  the windows appear once a turn has run.
+
+Each feature starts on its own. One that throws is skipped alone and named in
+`/tower`, rather than taking the other three down with it.
 
 ## About the WhatsApp notifications
 

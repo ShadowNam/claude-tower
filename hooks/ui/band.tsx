@@ -108,8 +108,18 @@ export const registerBand: Feature = (on, options) => {
     const unreachable = tank === null ? 0 : tank.instances.filter(i => !i.ok).length
     const unseen = tank === null ? 0 : unseenOf(tank)
 
-    // Nothing measured yet is nothing worth a row.
-    if (windowList.length === 0 && view === null && !busy && build === null && unseen === 0) return next(e)
+    // Nothing to report from any of the four.
+    const quiet = windowList.length === 0 && view === null && !busy && build === null && unseen === 0
+
+    // The engine hands over the context it is carrying at session.start but
+    // the rate-limit windows only on a later measurement, so a fresh session
+    // has figures without having windows. Drawing nothing there is what makes
+    // a loaded mod look like one that never installed, so the row stays and
+    // carries what is known.
+    const bare = windowList.length === 0 && view === null && !busy && build === null
+    const knowsLedger = u.ledger.window > 0 || u.ledger.usd !== null
+
+    if (quiet && !(wantsUsage && knowsLedger)) return next(e)
 
     // Other mods' bands draw under this one. The engine's own placeholder is
     // not nestable, so it is dropped rather than wrapped.
@@ -210,8 +220,10 @@ export const registerBand: Feature = (on, options) => {
       }
     }
 
+    // Normally a wide-terminal extra; with no windows to draw it is the row's
+    // only content, so width stops deciding.
     const ctx =
-      columns >= CTX_AT && u.ledger.window > 0 ? (
+      (columns >= CTX_AT || bare) && u.ledger.window > 0 ? (
         <Box key="ctx" flexDirection="row" flexShrink={0} marginRight={3}>
           <Text color={DIM}>ctx </Text>
           <Text color={TEXT}>{Math.round((u.ledger.tokens / u.ledger.window) * 100)}%</Text>
@@ -227,6 +239,14 @@ export const registerBand: Feature = (on, options) => {
         </Box>
       )
 
+    // Said once, while the windows are still unknown: it tells the difference
+    // between a mod with no news and a mod that is not there.
+    const waiting = bare ? (
+      <Box key="waiting" flexDirection="row" flexShrink={0} marginRight={3}>
+        <Text color={DIM}>windows not measured yet · /tower</Text>
+      </Box>
+    ) : null
+
     const row = (
       <Box key="row" flexDirection="row" paddingX={1}>
         {label}
@@ -236,12 +256,15 @@ export const registerBand: Feature = (on, options) => {
         {cache}
         {ctx}
         {cost}
+        {waiting}
       </Box>
     )
 
     // Narrow: the cache and the cost get a line of their own under the blocks.
+    // With no windows there is nothing to stack, so the one row serves at any
+    // width.
     const rows =
-      isWide || isStacked
+      isWide || isStacked || bare
         ? [row]
         : [
             <Box key="row" flexDirection="row" paddingX={1}>

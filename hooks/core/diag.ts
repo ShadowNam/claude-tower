@@ -2,10 +2,11 @@ import type { EngineInterface } from 'claude-code'
 
 import { panelsOf, since } from './fmt'
 import type { Feature, Options } from './kinds'
-import { readDiag, writeDiag } from './state'
+import { readDiag, readUsage, writeDiag } from './state'
+import { cacheView, statusOf } from './usage'
 
 /** Must match the version in .claude-plugin/plugin.json. */
-const VERSION = '3.2.0'
+const VERSION = '3.3.0'
 
 /**
  * Seeds what `/tower` reports. Called from the mod's one session.start hook:
@@ -63,6 +64,22 @@ export const registerDiag: Feature = (on, options) => {
     if (!d) return { text: 'Tower is loaded, but this session has not started it yet.' }
     const now = await $.clock.now()
 
+    const figures: string[] = []
+    try {
+      const u = await readUsage($)
+      const cache = cacheView(u.cache, now, u.cacheTtlMs)
+      figures.push(`  windows    ${u.windows.length === 0 ? 'none read yet' : u.windows.map(w => `${w.kind} ${Math.round(100 - w.percentUsed)}% left`).join(', ')}`)
+      figures.push(`  cache      ${cache === null ? 'not stamped yet' : `${cache.mode}, ${cache.leftMin}m left`}`)
+      figures.push(`  ledger     ${u.ledger.usd === null ? 'no cost yet' : `$${u.ledger.usd.toFixed(2)}`} · ${u.ledger.tokens} of ${u.ledger.window} tokens`)
+      // The band's own gate, reported rather than reasoned about.
+      const knows = u.ledger.window > 0 || u.ledger.usd !== null
+      const bare = u.windows.length === 0 && cache === null
+      figures.push(`  band       ${bare && !knows ? 'nothing to draw — it yields the row' : 'has figures to draw'}`)
+      figures.push(`  status     ${statusOf(u, now, u.cacheTtlMs) || '(empty, so no line is set)'}`)
+    } catch (err) {
+      figures.push(`  figures    could not be read: ${String(err).slice(0, 80)}`)
+    }
+
     // Asked now, not remembered from load. A surface attaches after
     // session.start, so the value stamped at load says 'none' for the whole
     // session while the band is plainly drawing on one — which made the one
@@ -83,6 +100,11 @@ export const registerDiag: Feature = (on, options) => {
         `  surface    ${surfaces}`,
         `  loaded     ${since(now - d.loadedAt)} ago (load ${d.reloads} this session)`,
         `  panels     ${d.panels.length > 0 ? d.panels.join(', ') : 'none switched on'}`,
+        '',
+        // Five guesses tonight about why nothing drew, and not one of them
+        // looked at what the band actually holds. A report that cannot answer
+        // "is there anything to draw" is a report that sends you guessing.
+        ...figures,
         ...(failures.length > 0
           ? ['', `  ${failures.length} feature${failures.length === 1 ? '' : 's'} did not start:`, ...failures.map(f => `    ✗ ${f}`)]
           : []),

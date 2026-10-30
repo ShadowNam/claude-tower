@@ -6,7 +6,7 @@ import { advanceOf, isPlanTool, planOf } from '../hooks/core/plan'
 import { fold as foldRate, median, rateOf } from '../hooks/core/rate'
 import { deadKeys, liveCount } from '../hooks/core/sessions'
 import { priceOf, rewarmCost } from '../hooks/core/prices'
-import { cacheView, compactionOf, fold, headroom } from '../hooks/core/usage'
+import { cacheView, compactionOf, fold, headroom, statusOf } from '../hooks/core/usage'
 
 import type { Sample, Usage } from '../types'
 
@@ -368,3 +368,28 @@ test('only long-dead heartbeats are swept, and never this session’s own', asyn
   expect(deadKeys(entries, NOW, mine)).not.toContain(mine)
 })
 
+
+test('the figures survive the band being taken away', async () => {
+  const NOW = 1_800_000_000_000
+  const usage = {
+    windows: [
+      { kind: 'seven_day', percentUsed: 49, emptyAt: null },
+      { kind: 'five_hour', percentUsed: 12, emptyAt: null },
+    ],
+    compaction: null,
+    cache: { lastAt: NOW - 10 * 60_000, tokens: 1000, window: 200_000, model: 'claude-opus-5' },
+    ledger: { usd: 223.87, tokens: 1000, window: 200_000 },
+    samples: {},
+  }
+
+  // Short enough for one pinned line, and in the order the band uses.
+  expect(statusOf(usage, NOW)).toBe('tower  7D 51%  ·  5H 88%  ·  warm  ·  $223.87')
+  expect(statusOf(usage, NOW).length < 60).toBe(true)
+
+  // Nothing measured says nothing, rather than an empty frame.
+  expect(statusOf({ ...usage, windows: [], cache: null, ledger: { usd: null, tokens: 0, window: 0 } }, NOW))
+    .toBe('')
+
+  // The cache follows the real lifetime, same as the band's.
+  expect(statusOf(usage, NOW, 5 * 60_000)).toContain('cold')
+})

@@ -54,6 +54,21 @@ as though it were current. When more than one of your sessions is alive, the
 band says how many, which is the answer to "why did that drop while I was
 reading".
 
+### When the band is not there
+
+The engine's own notices hold the band's slot — a weekly-limit warning can
+hold it for days — and a hook yields to them, as it should. So the figures
+also go to the status line, one pinned row under the prompt that nothing else
+can take:
+
+```
+tower  7D 51%  ·  5H 88%  ·  warm  ·  $223.87
+```
+
+It is set on the same timer the band uses, not while drawing, because a render
+may do no I/O — and because it has to keep working when the drawing does not
+run at all, which is the entire point of it.
+
 ### Layouts
 
 The same figures, arranged four ways. Change it in `/config`; nothing restarts.

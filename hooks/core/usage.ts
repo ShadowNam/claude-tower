@@ -218,6 +218,16 @@ export async function startUsage($: EngineInterface): Promise<void> {
       const at = await $.clock.now()
       await refresh($, at)
       await beat($, at)
+
+      // Set here rather than in the drawing, because a render may do no I/O —
+      // and because this has to keep working when the drawing does not run
+      // at all, which is the whole point of it.
+      try {
+        const line = statusOf(await readUsage($), at)
+        if (line !== '') $.ui.status(line)
+      } catch {
+        // A line that cannot be set costs a line.
+      }
       if (await isMoving($, at)) {
         skipped = 0
         await bumpTick($)
@@ -230,6 +240,34 @@ export async function startUsage($: EngineInterface): Promise<void> {
       }
     })()
   })
+}
+
+/**
+ * The figures as one short line, for the status slot.
+ *
+ * The band can be taken from Tower at any time: the engine's own notices hold
+ * that slot and a hook yields to them, as it should. A weekly-limit warning
+ * holds it for days. Yielding silently means there is no way to tell a taken
+ * slot from a broken mod — which cost an evening and four versions that fixed
+ * nothing, because every symptom of "the engine is using the band" is also a
+ * symptom of "your plugin is broken".
+ *
+ * So the figures also go somewhere that cannot be taken. One line, per
+ * plugin, under the prompt. Pure, so what it says can be tested.
+ */
+export function statusOf(u: Usage, now: number, ttlMs?: number): string {
+  // The band's short names, not the long ones a message uses: this is one
+  // line sharing a row with everything else the engine pins there.
+  const SHORT: Readonly<Record<string, string>> = { seven_day: '7D', five_hour: '5H', spend_limit: 'SPEND' }
+  const parts: string[] = []
+  for (const w of u.windows) {
+    const left = Math.max(0, Math.round(100 - w.percentUsed))
+    parts.push(`${SHORT[w.kind] ?? w.kind} ${left}%`)
+  }
+  const cache = cacheView(u.cache, now, ttlMs)
+  if (cache !== null) parts.push(cache.mode)
+  if (u.ledger.usd !== null) parts.push(`$${u.ledger.usd.toFixed(2)}`)
+  return parts.length === 0 ? '' : `tower  ${parts.join('  ·  ')}`
 }
 
 /**

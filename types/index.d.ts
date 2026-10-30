@@ -309,6 +309,8 @@ declare module 'claude-code' {
       edits: Edits
       shape: Shape
       plan: Plan | null
+      /** A layout pressed on the band; empty means the setting decides. */
+      picked: string
     }
   }
 }

@@ -4,7 +4,7 @@ import { projectWithin, trim } from './burn'
 import { until } from './fmt'
 import type { Feature } from './kinds'
 import { beat } from './sessions'
-import { bumpTick, readAgents, readBuilds, readUsage, writeUsage } from './state'
+import { bumpTick, readAgents, readBuilds, readUsage, writePicked, writeUsage } from './state'
 
 import type { CacheFacts, Compaction, Sample, Usage, UsageWindow } from '../../types'
 
@@ -206,6 +206,15 @@ export function nextLayout(current: Layout): Layout {
  */
 export async function startUsage($: EngineInterface): Promise<void> {
   const now = await $.clock.now()
+
+  // A layout pressed in an earlier session outranks the setting, so the band
+  // comes back the way it was left.
+  try {
+    const kept = await $.store.get('layout')
+    if (typeof kept === 'string' && kept !== '') await writePicked($, kept)
+  } catch {
+    // No kept choice is no problem: the setting decides.
+  }
   // 'summary' estimates locally and sends nothing; 'full' would bill a
   // token-count request per tool and memory file, which a band must never do.
   const u = await $.session.usage({ breakdown: 'summary' })

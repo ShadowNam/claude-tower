@@ -121,7 +121,7 @@ test('a switched-off band draws nothing at all', { options: { usageBand: false }
 })
 
 test('the band names the layout it is drawing, and cycles on a press', async ($, on) => {
-  const set: { key: string; value: unknown }[] = []
+  const kept: Record<string, unknown> = {}
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.version', () => ({ value: { version: '2.1.309', base: 'test', builtAt: '' } }))
   on('session.model', () => ({ value: 'claude-opus-5' }))
@@ -129,10 +129,11 @@ test('the band names the layout it is drawing, and cycles on a press', async ($,
   on('command.register', () => ({ value: { command: 'tower' } }))
   on('clock.now', () => ({ value: NOW }))
   on('clock.every', () => ({ value: {} }))
-  on('config.set', (_, e) => {
+  on('store.get', (_, e) => ({ value: kept[String((e as { key?: unknown }).key)] ?? null }))
+  on('store.set', (_, e) => {
     const row = e as { key: string; value: unknown }
-    set.push(row)
-    return { value: String(row.value) }
+    kept[row.key] = row.value
+    return { value: undefined }
   })
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -142,16 +143,21 @@ test('the band names the layout it is drawing, and cycles on a press', async ($,
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
 
-  // The control is the band's own label, so it costs no columns of its own.
-  const cycle = await ui.find({ type: 'Button', label: 'USAGE' })
-  expect(cycle !== undefined).toBe(true)
+  // The control is the band's own label, so it costs no columns of its own,
+  // and the layout it is drawing is written beside it.
+  expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
+  expect((await ui.find({ type: 'Text', text: /^dials$/ }))?.text).toBe('dials')
 
-  // Pressing it writes the setting, which is what makes the change stick
-  // rather than lasting until the next reload.
+  // A press writes state, so the band redraws, and the store, so the choice
+  // outlives the session. It used to call config.set, which answers { deny }
+  // rather than throwing when the row is not the plugin's to write — and the
+  // press ignored the answer, so a refusal looked like a dead button.
   await ui.press({ key: 'cycle' })
-  expect(set.length).toBe(1)
-  expect(set[0]?.key).toBe('bandLayout')
-  expect(set[0]?.value).toBe('hero')
+  expect(kept['layout']).toBe('hero')
+  expect((await ui.find({ type: 'Text', text: /^hero$/ }))?.text).toBe('hero')
+
+  await ui.press({ key: 'cycle' })
+  expect(kept['layout']).toBe('cards')
   await ui.unmount()
 })
 

@@ -4,7 +4,8 @@ import { at, dots, since, tokens, until, usd } from '../core/fmt'
 import { CAPSULE_SIZE, capsule, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
-import { readAgents, readBuilds, readTick, readUsage } from '../core/state'
+import { FAULT_MS, faultWord } from '../core/shape'
+import { readAgents, readBuilds, readEdits, readShape, readTick, readUsage } from '../core/state'
 import { cacheView, headroom, TTL_MIN } from '../core/usage'
 import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
@@ -96,6 +97,11 @@ export const registerBand: Feature = (on, options) => {
     const agents = wantsAgents ? totalsOf(await readAgents($), now) : null
     const busy = agents !== null && agents.running > 0
 
+    const edits = wantsUsage ? await readEdits($) : null
+    const shape = wantsUsage ? await readShape($) : null
+    const fault =
+      shape?.fault != null && now - shape.fault.at < FAULT_MS ? faultWord(shape.fault.kind) : null
+
     const builds = wantsBuilds ? await readBuilds($) : []
     const head = headlineOf(builds, now)
     const build = head === null ? null : viewOf(head, now)
@@ -103,7 +109,9 @@ export const registerBand: Feature = (on, options) => {
 
 
     // Nothing to report from any of the four.
-    const quiet = windowList.length === 0 && view === null && !busy && build === null
+    const hasEdits = edits !== null && edits.files.length > 0
+    const quiet =
+      windowList.length === 0 && view === null && !busy && build === null && fault === null
 
     // The engine hands over the context it is carrying at session.start but
     // the rate-limit windows only on a later measurement, so a fresh session
@@ -290,14 +298,55 @@ export const registerBand: Feature = (on, options) => {
       </Box>
     ) : null
 
+    // A failed turn outranks everything: the session stopped, and nothing
+    // else on screen says why.
+    const alarm =
+      fault === null ? null : (
+        <Box key="fault" flexDirection="row" flexShrink={0} alignItems="center" gap={1}>
+          {Svg === null ? null : <Svg source={orb(BAD, 'alert')} alt="failed" {...ORB_SIZE} />}
+          <Text backgroundColor={BAD} color={INK} weight="bold">{` ${fault.toUpperCase()} `}</Text>
+        </Box>
+      )
+
+    const compacting =
+      shape?.compacting == null ? null : (
+        <Box key="compacting" flexShrink={0}>
+          <Text color={WARN} weight="bold">
+            {shape.compacting === 'soon' ? 'COMPACTING SOON' : 'COMPACTING'}
+          </Text>
+        </Box>
+      )
+
+    const effortChip =
+      shape?.effort === undefined || shape.effort === '' || shape.effort === 'medium' ? null : (
+        <Box key="effort" flexShrink={0}>
+          <Text color={DIM}>{shape.effort}</Text>
+        </Box>
+      )
+
+    const editChip =
+      !hasEdits || edits === null ? null : (
+        <Box key="edits" flexDirection="row" flexShrink={0}>
+          <Text color={DIM}>edits </Text>
+          <Text color={TEXT} tabular>{edits.files.length}</Text>
+          <Text color={DIM}> {edits.files.length === 1 ? 'file' : 'files'} </Text>
+          <Text color={OK} tabular>+{edits.added}</Text>
+          <Text color={BAD} tabular> −{edits.removed}</Text>
+        </Box>
+      )
+
     const row = (
       <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center">
+        {alarm}
+        {compacting}
         {label}
         {windows}
         {crew}
         {cache}
         {ctx}
+        {editChip}
         {cost}
+        {effortChip}
         {waiting}
       </Box>
     )

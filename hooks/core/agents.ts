@@ -50,6 +50,7 @@ function blank(id: string, now: number): AgentRun {
     steps: 0,
     lastStepAt: now,
     toolErrors: 0,
+    toolMs: 0,
     touched: [],
   }
 }
@@ -363,4 +364,18 @@ export const registerAgents: Feature = (on, options) => {
     }
     return { text: '' }
   })
+}
+
+/**
+ * How long a tool took, from `classic.PostToolUse`, which is the only place
+ * the engine gives it — `tool.call` wraps the call but never times it, since
+ * what it measures would include permission prompts and every other plugin's
+ * hooks.
+ */
+export async function noteToolTime($: EngineInterface, agentId: string | undefined, ms: number): Promise<void> {
+  if (!Number.isFinite(ms) || ms <= 0) return
+  const id = agentId ?? MAIN
+  await writeAgents($, prev =>
+    prev.map(a => (a.id === id || a.agentId === id ? { ...a, toolMs: a.toolMs + ms, lastToolMs: ms } : a)),
+  )
 }

@@ -1,5 +1,6 @@
 import { noteComplete, noteStep } from './agents'
 import type { Feature } from './kinds'
+import { noteEffort } from './shape'
 import { completeCache, stampCache } from './usage'
 
 /**
@@ -16,7 +17,10 @@ export const registerTurns: Feature = (on, options) => {
   on('turn.step', async function* ($, e, next) {
     // A main-thread request reads or writes the prompt cache, so its start is
     // what resets the hour. A subagent loop has a cache of its own.
-    if (wantsUsage && e.agentId === undefined) await stampCache($)
+    if (wantsUsage && e.agentId === undefined) {
+      await stampCache($)
+      await noteEffort($, e.effort)
+    }
 
     const result = yield* next(e)
 

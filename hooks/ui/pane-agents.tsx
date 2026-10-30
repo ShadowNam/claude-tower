@@ -148,6 +148,7 @@ export const registerAgentsPane: Feature = (on, options) => {
             </Text>
           )}
           <Text color={DIM}> · {run.costUsd === null ? '$?' : usd(run.costUsd)} · {elapsed}</Text>
+          {run.toolMs > 0 ? <Text color={DIM} tabular> · {since(run.toolMs)} in tools</Text> : null}
           {run.toolErrors > 0 ? <Text color={BAD}> · {run.toolErrors} tool errors</Text> : null}
         </Box>
       )

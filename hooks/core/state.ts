@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRun, AgentsPanel, Build, Diag, Usage } from '../../types'
+import type { AgentRun, AgentsPanel, Build, Diag, Edits, Shape, Usage } from '../../types'
 
 /**
  * Every atom lives here, with the reads and writes that touch it: the engine's
@@ -94,4 +94,28 @@ export function readPanel($: EngineInterface): Promise<AgentsPanel> {
 
 export async function writePanel($: EngineInterface, fn: (prev: AgentsPanel) => AgentsPanel): Promise<void> {
   await update($, panel, fn)
+}
+
+export const EMPTY_EDITS: Edits = { files: [], added: 0, removed: 0 }
+
+const edits = atom({ plugin: 'tower', key: 'edits' } as const, EMPTY_EDITS)
+
+export function readEdits($: EngineInterface): Promise<Edits> {
+  return read($, edits)
+}
+
+export async function writeEdits($: EngineInterface, fn: (prev: Edits) => Edits): Promise<void> {
+  await update($, edits, fn)
+}
+
+export const EMPTY_SHAPE: Shape = { effort: '', compacting: null, fault: null }
+
+const shape = atom({ plugin: 'tower', key: 'shape' } as const, EMPTY_SHAPE)
+
+export function readShape($: EngineInterface): Promise<Shape> {
+  return read($, shape)
+}
+
+export async function writeShape($: EngineInterface, fn: (prev: Shape) => Shape): Promise<void> {
+  await update($, shape, fn)
 }

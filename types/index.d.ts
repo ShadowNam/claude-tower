@@ -87,6 +87,35 @@ export type Usage = {
   samples: Readonly<Record<string, readonly Sample[]>>
 }
 
+/**
+ * What this session changed, as Tower watched it happen.
+ *
+ * Not a working tree: it cannot see an edit made outside the session and does
+ * not un-count a reverted file. Named `session edits` wherever it is drawn,
+ * because the name is the only thing stopping it being read as `git status`.
+ */
+export type Edits = {
+  files: readonly string[]
+  added: number
+  removed: number
+}
+
+/** A turn that ended badly, as the engine named it. */
+export type Fault = {
+  /** The engine's own kind: `rate_limit`, `overloaded`, and the rest. */
+  kind: string
+  at: number
+}
+
+/** What the session knows about its own shape, beyond the usage figures. */
+export type Shape = {
+  /** The effort the turn ran at, after any silent downgrade. */
+  effort: string
+  /** Set while a compaction is running, or expected. */
+  compacting: 'running' | 'soon' | null
+  fault: Fault | null
+}
+
 export type AgentStatus = 'running' | 'done' | 'failed'
 
 /** One agent loop: the main session, or a subagent of it. */
@@ -128,6 +157,10 @@ export type AgentRun = {
   toolDetail?: string
   /** Tool calls that came back an error. */
   toolErrors: number
+  /** Summed tool execution time, as the engine reports it per call. */
+  toolMs: number
+  /** What the last finished tool took, for the row to name. */
+  lastToolMs?: number
   /** Distinct files read or written, newest last, capped. */
   touched: readonly string[]
 }
@@ -192,6 +225,8 @@ declare module 'claude-code' {
       agents: readonly AgentRun[]
       panel: AgentsPanel
       builds: readonly Build[]
+      edits: Edits
+      shape: Shape
     }
   }
 }

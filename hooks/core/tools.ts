@@ -1,5 +1,6 @@
 import { detailOf, noteToolEnd, noteToolStart } from './agents'
 import { isWorthTelling, noteBuildEnd, noteBuildStart } from './builds'
+import { isWriter, noteEdit } from './edits'
 import type { Feature } from './kinds'
 
 /**
@@ -15,7 +16,8 @@ import type { Feature } from './kinds'
 export const registerTools: Feature = (on, options) => {
   const wantsAgents = options.agentsPanel === true
   const wantsBuilds = options.buildBar === true
-  if (!wantsAgents && !wantsBuilds) return
+  const wantsEdits = options.usageBand === true
+  if (!wantsAgents && !wantsBuilds && !wantsEdits) return
 
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
@@ -44,6 +46,8 @@ export const registerTools: Feature = (on, options) => {
     const isError = typeof result === 'object' && result !== null && (result as { isError?: boolean }).isError === true
 
     if (wantsAgents) await noteToolEnd($, e.agentId, isError)
+    // A call that failed changed nothing, so it is counted only once it has.
+    if (wantsEdits && !isError && isWriter(tool)) await noteEdit($, tool, input)
     if (build !== null) {
       const out = typeof result === 'object' && result !== null ? (result as { result?: unknown }).result : undefined
       const done = await noteBuildEnd($, build, isError, typeof out === 'string' ? out : '')

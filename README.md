@@ -36,6 +36,17 @@ window is a drawn meter and the band carries the mod's mark, so it is obvious at
 glance whose row it is. The terminal gets dot strings saying the same thing, and every
 figure is written out either way: a drawing is never the only account of a number.
 
+It also carries what nothing else on screen does: the effort the turn actually
+ran at (after any silent downgrade), how many files this session has changed and
+by how many lines, a warning before the context is compacted rather than after,
+and the engine's own reason when a turn fails — rate limited, overloaded,
+billing — which otherwise leaves the session simply stopping with nothing said.
+
+The edit count is **what Tower watched happen**, not `git status`: it cannot see
+a change made in your editor and will not un-count a file you reverted. That is
+what the name `edits` is doing, and why it is not called anything suggesting a
+working tree.
+
 **Usage** — how much of your 5-hour and 7-day windows is left, when each resets, whether the
 prompt cache is warm and what re-sending the context will cost once it is not, and what the
 engine says the session has cost. When a window is being spent fast enough to run out

@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import { projectOf } from './builds'
+import { rememberRun } from './builds'
 import { writeBuilds } from './state'
 
 import type { Build, BuildState } from '../../types'
@@ -102,7 +103,21 @@ export async function pollMarker($: EngineInterface, cwd: string, now: number): 
 
   const build = buildOf(raw, cwd, now)
   if (build === null) return
-  await writeBuilds($, prev => [...prev.filter(b => b.id !== build.id), build].slice(-8))
+
+  // A marker build has to teach the estimator too, or the one source a person
+  // is told to wire up is the one that never learns how long it takes. The
+  // poll sees the same finished state over and over until the file goes, so
+  // the duration is only kept the first time this build is seen finished.
+  let settled = false
+  await writeBuilds($, prev => {
+    const before = prev.find(b => b.id === build.id)
+    settled = build.state === 'succeeded' && (before === undefined || before.state !== 'succeeded')
+    return [...prev.filter(b => b.id !== build.id), build].slice(-8)
+  })
+
+  if (settled && build.endedAt !== undefined) {
+    await rememberRun($, build.key, build.endedAt - build.startedAt, now)
+  }
 }
 
 /** What `/tower-hook` prints: the smallest emitter that satisfies the reader. */

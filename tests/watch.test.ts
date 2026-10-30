@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { sweepStale } from '../hooks/core/builds'
+import { keyOf, runsKey, sweepStale } from '../hooks/core/builds'
 import { changeOf, fold as foldEdit, hunkOf, isWriter } from '../hooks/core/edits'
 import { branchOf, gitDirOf, isProtected } from '../hooks/core/git'
 import { buildOf } from '../hooks/core/marker'
@@ -175,4 +175,13 @@ test('the last edit becomes a hunk the engine can colour', async () => {
   // written down, which is its own trap in a JavaScript string.
   expect(hunkOf('C:\\src\\app\\main.ts', 'a', 'b')).toContain('--- a/main.ts')
   expect(hunkOf('/home/me/src/main.ts', 'a', 'b')).toContain('--- a/main.ts')
+})
+
+test('the history is written where it is read from', async () => {
+  // A reader and a writer that disagree about the key fail silently and for
+  // ever: the history is written, nothing reads it, and the estimate never
+  // arrives. Both sides go through one helper so they cannot drift.
+  expect(runsKey('abc123')).toBe('build:abc123')
+  expect(runsKey(keyOf('/src/app', 'npm run build', false)))
+    .toBe(`build:${keyOf('/src/app', 'npm run build', false)}`)
 })

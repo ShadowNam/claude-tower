@@ -95,10 +95,21 @@ function isRun(v: unknown): v is BuildRun {
   )
 }
 
+/**
+ * Where a build's history lives in the store.
+ *
+ * One helper because a reader and a writer that disagree about the key fail
+ * silently and for ever: the history is written, nothing ever reads it, and
+ * the estimate simply never arrives. That happened here once.
+ */
+export function runsKey(key: string): string {
+  return `build:${key}`
+}
+
 /** Past durations for this build, across every session that has run it. */
 async function loadRuns($: EngineInterface, key: string): Promise<BuildRun[]> {
   try {
-    const raw = await $.store.get(`build:${key}`)
+    const raw = await $.store.get(runsKey(key))
     const list = Array.isArray(raw) ? raw : (raw as { runs?: unknown } | null)?.runs
     return Array.isArray(list) ? list.filter(isRun).slice(-MAX_RUNS) : []
   } catch {
@@ -185,15 +196,7 @@ export async function noteBuildEnd(
   // the baseline down, so the next build would be told it is running late.
   const done: Build | null = finished
   if (done === null || isError) return done
-  const ms = now - done.startedAt
-  if (ms < MIN_INTEREST_MS) return done
-
-  try {
-    const runs = remember(await loadRuns($, done.key), { at: now, ms }, MAX_RUNS)
-    await $.store.set(`build:${done.key}`, { runs })
-  } catch {
-    // Losing one duration costs a little accuracy and nothing else.
-  }
+  await rememberRun($, done.key, now - done.startedAt, now)
   return done
 }
 
@@ -290,4 +293,24 @@ export function othersOf(builds: readonly Build[], headline: Build | null, now: 
   return builds.filter(
     b => b.id !== headline?.id && (b.state === 'running' || b.state === 'failed' || now - (b.endedAt ?? 0) < LINGER_MS),
   )
+}
+
+/**
+ * Keeps one finished build's duration, so the estimator has something to work
+ * from next time.
+ *
+ * Exported because the marker file's poll needs it too: that is the source a
+ * person is actually told to wire up, and a source that never teaches the
+ * estimator would say "no estimate yet" for ever.
+ */
+export async function rememberRun($: EngineInterface, key: string, ms: number, now: number): Promise<void> {
+  if (!Number.isFinite(ms) || ms < MIN_INTEREST_MS) return
+  try {
+    const runs = remember(await loadRuns($, key), { at: now, ms }, MAX_RUNS)
+    // The same key and shape loadRuns reads. Writing a different one would
+    // store a history nothing ever looks at, which fails silently for ever.
+    await $.store.set(runsKey(key), { runs })
+  } catch {
+    // A history that cannot be written costs an estimate, never a build.
+  }
 }

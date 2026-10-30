@@ -3,7 +3,6 @@ import type { EngineInterface } from 'claude-code'
 import { projectWithin, trim } from './burn'
 import { until } from './fmt'
 import type { Feature } from './kinds'
-import { notify } from './notify'
 import { bumpTick, writeUsage } from './state'
 
 import type { CacheFacts, Sample, Usage, UsageWindow } from '../../types'
@@ -151,22 +150,6 @@ export const registerUsage: Feature = (on, options) => {
     const now = await $.clock.now()
     await writeUsage($, prev => fold(prev, e, now))
 
-    // A limit about to bite is worth hearing about away from the machine.
-    if (e.changed.includes('rateLimits')) {
-      for (const w of e.rateLimits) {
-        const name = NAMES[w.kind] ?? w.kind
-        if (w.percentUsed >= 100) {
-          await notify($, options, 'ratelimit.hit', w.kind, {
-            detail: `The ${name} window is spent. It resets ${until(w.resetsAt, now) || 'shortly'}.`,
-          })
-        } else if (w.percentUsed >= 90) {
-          await notify($, options, 'ratelimit.near', w.kind, {
-            detail: `${Math.round(w.percentUsed)}% of ${name}`,
-            extra: `Resets ${until(w.resetsAt, now) || 'shortly'}.`,
-          })
-        }
-      }
-    }
 
     return next(e)
   }).catch(($, e, next) => next(e))

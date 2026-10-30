@@ -1,6 +1,5 @@
 import { noteComplete, noteStep } from './agents'
 import type { Feature } from './kinds'
-import { notify } from './notify'
 import { completeCache, stampCache } from './usage'
 
 /**
@@ -44,14 +43,6 @@ export const registerTurns: Feature = (on, options) => {
       const reason = typeof named === 'string' ? named : e.isAborted ? 'aborted' : 'answer'
       await noteComplete($, e.agentId, reason)
 
-      // A subagent that stopped without answering is the one agent event
-      // worth a message: it means work was left undone.
-      if (e.agentId !== undefined && reason !== 'answer') {
-        await notify($, options, 'agent.failed', e.agentId, {
-          detail: `A subagent stopped after ${Math.round(e.durationMs / 1000)}s.`,
-          extra: reason,
-        })
-      }
     }
 
     if (wantsUsage && e.agentId === undefined) {

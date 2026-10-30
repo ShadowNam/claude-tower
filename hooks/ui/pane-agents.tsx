@@ -2,6 +2,7 @@ import { MAIN, PANE, runModel, STUCK_MS, totalsOf, tree } from '../core/agents'
 import { since, tokens, usd } from '../core/fmt'
 import type { Feature } from '../core/kinds'
 import { readAgents, readPanel, readTick, readUsage, writePanel } from '../core/state'
+import { CAPSULE_SIZE, capsule, ORB_SIZE, orb } from './art'
 import { BAD, DIM, EMPTY, OK, TEXT, WARN } from './theme'
 
 import type { AgentRun } from '../../types'
@@ -40,7 +41,10 @@ export const registerAgentsPane: Feature = (on, options) => {
     const usage = await readUsage($)
     const now = await $.clock.now()
 
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Text } = ui
+    // The terminal's table still lists Svg, so ask the surface, not the table.
+    const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
     const totals = totalsOf(list, now)
     const rows = tree(list).filter(r => r.run.id !== MAIN || r.run.steps > 0)
 
@@ -113,9 +117,15 @@ export const registerAgentsPane: Feature = (on, options) => {
         run.status === 'running' && run.tool === undefined && now - run.lastStepAt > STUCK_MS && run.steps > 0
 
       const title = (
-        <Box key={`t${i}`} flexDirection="row">
+        <Box key={`t${i}`} flexDirection="row" alignItems="center">
           <Text color={DIM}>{pad}</Text>
-          <Text color={COLOR[run.status] ?? TEXT}>{GLYPH[run.status] ?? '●'} </Text>
+          {Svg === null ? (
+            <Text color={COLOR[run.status] ?? TEXT}>{GLYPH[run.status] ?? '●'} </Text>
+          ) : (
+            <Box marginRight={1}>
+              <Svg source={orb(COLOR[run.status] ?? TEXT)} alt={run.status} {...ORB_SIZE} />
+            </Box>
+          )}
           <Text color={TEXT} wrap="truncate-end">{run.id === MAIN ? 'this session' : run.description}</Text>
           <Box flexGrow={1} />
           <Text color={DIM}>{runModel(run)}</Text>
@@ -125,10 +135,13 @@ export const registerAgentsPane: Feature = (on, options) => {
       if (panel.isCompact) return [title]
 
       const stats = (
-        <Box key={`s${i}`} flexDirection="row">
+        <Box key={`s${i}`} flexDirection="row" alignItems="center">
           <Text color={DIM}>{pad}  </Text>
-          {ctx === null ? null : <Text color={COLOR[run.status] ?? TEXT}>{bar(ctx.percent).on}</Text>}
-          {ctx === null ? null : <Text color={EMPTY}>{bar(ctx.percent).off}</Text>}
+          {ctx === null || Svg !== null ? null : <Text color={COLOR[run.status] ?? TEXT}>{bar(ctx.percent).on}</Text>}
+          {ctx === null || Svg !== null ? null : <Text color={EMPTY}>{bar(ctx.percent).off}</Text>}
+          {ctx === null || Svg === null ? null : (
+            <Svg source={capsule(ctx.percent, COLOR[run.status] ?? TEXT)} alt={`context ${ctx.percent}%`} {...CAPSULE_SIZE} />
+          )}
           {ctx === null ? null : (
             <Text color={ctx.percent >= 90 ? WARN : DIM}>
               {' '}ctx {ctx.isKnown ? '' : '~'}{ctx.percent}%

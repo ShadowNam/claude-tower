@@ -5,7 +5,7 @@ import type { Feature, Options } from './kinds'
 import { readDiag, writeDiag } from './state'
 
 /** Must match the version in .claude-plugin/plugin.json. */
-const VERSION = '1.0.5'
+const VERSION = '2.0.0'
 
 /**
  * Seeds what `/tower` reports. Called from the mod's one session.start hook:
@@ -62,7 +62,6 @@ export const registerDiag: Feature = (on, options) => {
     const d = await readDiag($)
     if (!d) return { text: 'Tower is loaded, but this session has not started it yet.' }
     const now = await $.clock.now()
-    const quiet = String(options.quietHours ?? '')
     const failures = d.failures ?? []
     return {
       text: [
@@ -72,9 +71,6 @@ export const registerDiag: Feature = (on, options) => {
         `  surface    ${d.surface}`,
         `  loaded     ${since(now - d.loadedAt)} ago (load ${d.reloads} this session)`,
         `  panels     ${d.panels.length > 0 ? d.panels.join(', ') : 'none switched on'}`,
-        `  notify     ${String(options.notifyLevel ?? 'silent')}`,
-        `  watchdog   ${String(options.tankWatchdog ?? 'alert')}`,
-        `  quiet      ${quiet === '' ? 'off' : quiet}`,
         ...(failures.length > 0
           ? ['', `  ${failures.length} feature${failures.length === 1 ? '' : 's'} did not start:`, ...failures.map(f => `    ✗ ${f}`)]
           : []),

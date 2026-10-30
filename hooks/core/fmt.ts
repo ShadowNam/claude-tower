@@ -57,7 +57,6 @@ export function panelsOf(options: Readonly<Record<string, unknown>>): string[] {
     ['usageBand', 'usage'],
     ['agentsPanel', 'agents'],
     ['buildBar', 'build'],
-    ['tankPanel', 'tank'],
   ]
   return all.filter(([key]) => options[key] === true).map(([, label]) => label)
 }

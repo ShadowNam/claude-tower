@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRun, AgentsPanel, Build, Diag, Tank, Usage } from '../../types'
+import type { AgentRun, AgentsPanel, Build, Diag, Usage } from '../../types'
 
 /**
  * Every atom lives here, with the reads and writes that touch it: the engine's
@@ -83,17 +83,9 @@ export async function writeBuilds(
   await update($, builds, fn)
 }
 
-export const EMPTY_TANK: Tank = { instances: [], alerts: [], resumes: {} }
 
-const tank = atom({ plugin: 'tower', key: 'tank' } as const, EMPTY_TANK)
 
-export function readTank($: EngineInterface): Promise<Tank> {
-  return read($, tank)
-}
 
-export async function writeTank($: EngineInterface, fn: (prev: Tank) => Tank): Promise<void> {
-  await update($, tank, fn)
-}
 
 export function readPanel($: EngineInterface): Promise<AgentsPanel> {
   return read($, panel)

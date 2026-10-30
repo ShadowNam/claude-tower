@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { mark, meter } from '../hooks/ui/art'
+import { capsule, mark, orb } from '../hooks/ui/art'
 
 const BAND = {
   plugin: 'tower',
@@ -31,30 +31,46 @@ const SEED = (on: Parameters<Parameters<typeof test>[2]>[1]) => {
   on('clock.every', () => ({ value: {} }))
 }
 
-test('a meter is bounded markup whose fill follows the figure', async () => {
-  const full = meter(100, '#e8954a', '#4a463f')
-  const half = meter(50, '#e8954a', '#4a463f')
-  const none = meter(0, '#e8954a', '#4a463f')
-
-  for (const svg of [full, half, none]) {
+test('every drawing is bounded markup carrying no text and no script', async () => {
+  const drawings = [capsule(62, '#e8954a'), capsule(0, '#e8954a'), orb('#7fb069'), mark('#e8954a')]
+  for (const svg of drawings) {
     expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true)
     expect(svg.endsWith('</svg>')).toBe(true)
-    // A drawing carries no script and no text of its own.
-    expect(/<script|<text|onload=/i.test(svg)).toBe(false)
+    expect(/<script|<text|onload=|href=/i.test(svg)).toBe(false)
+    // Drawn at 2x and shown at 1x, so a gradient has pixels to resolve in.
+    expect(/viewBox="0 0 \d+ \d+" width="\d+" height="\d+"/.test(svg)).toBe(true)
   }
+})
 
-  // Empty draws the track alone; half draws a bar half the track's width.
-  expect(none.match(/<rect/g)?.length).toBe(1)
-  expect(half).toContain('width="38.00"')
-  expect(full).toContain('width="76.00"')
+test('a capsule fills to the figure and never past its track', async () => {
+  // 84 wide at 2x, less a pixel of inset either side: 166 of travel.
+  expect(capsule(100, '#e8954a')).toContain('width="166.00"')
+  expect(capsule(50, '#e8954a')).toContain('width="83.00"')
+  // Out of scale, and not a number at all, both stop at the ends.
+  expect(capsule(140, '#e8954a')).toContain('width="166.00"')
+  // Nothing left means no bead at all: the channel alone, one rect.
+  expect(capsule(-20, '#e8954a').match(/<rect/g)?.length).toBe(1)
+  expect(capsule(Number.NaN, '#e8954a').match(/<rect/g)?.length).toBe(1)
+  // And a real reading draws the bead, its specular and its rim.
+  expect(capsule(50, '#e8954a').match(/<rect/g)?.length).toBe(4)
+})
 
-  // A reading outside the scale cannot overdraw the track.
-  expect(meter(140, '#e8954a', '#4a463f')).toContain('width="76.00"')
-  expect(meter(Number.NaN, '#e8954a', '#4a463f').match(/<rect/g)?.length).toBe(1)
+test('a colour that is not a colour cannot become markup', async () => {
+  // Only ever three integers reach the file, whatever was handed in.
+  const hostile = capsule(50, 'red; }</style><script>alert(1)</script>')
+  expect(hostile).not.toContain('<script')
+  expect(hostile).not.toContain('</style>')
+  expect(hostile).toContain('rgb(136,136,136)')
+  expect(capsule(50, '#e84')).toContain('rgb(238,136,68)')
+  expect(mark('#e8954a')).toContain('rgb(')
+})
 
-  // A colour that is not a colour never reaches the markup.
-  expect(meter(50, 'red; }</style><script>x', '#4a463f')).not.toContain('<script')
-  expect(mark('#e8954a')).toContain('#e8954a')
+test('two drawings in one row never share a gradient id', async () => {
+  const a = capsule(40, '#e8954a')
+  const b = capsule(40, '#e8c84a')
+  const idOf = (s: string) => /id="(t[0-9a-z]+)b"/.exec(s)?.[1]
+  expect(idOf(a) !== undefined).toBe(true)
+  expect(idOf(a)).not.toBe(idOf(b))
 })
 
 test('the drawn surfaces get meters, the terminal keeps its dots', async ($, on) => {

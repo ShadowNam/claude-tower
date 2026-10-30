@@ -1,11 +1,10 @@
 import { totalsOf } from '../core/agents'
 import { headlineOf, othersOf, viewOf } from '../core/builds'
 import { at, dots, since, tokens, until, usd } from '../core/fmt'
-import { MARK_SIZE, mark, METER_SIZE, meter } from './art'
+import { CAPSULE_SIZE, capsule, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
-import { readAgents, readBuilds, readTank, readTick, readUsage } from '../core/state'
-import { unseenOf } from '../core/tank'
+import { readAgents, readBuilds, readTick, readUsage } from '../core/state'
 import { cacheView, TTL_MIN } from '../core/usage'
 import { BAD, BG, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
@@ -79,8 +78,7 @@ export const registerBand: Feature = (on, options) => {
   const wantsUsage = options.usageBand === true
   const wantsAgents = options.agentsPanel === true
   const wantsBuilds = options.buildBar === true
-  const wantsTank = options.tankPanel === true
-  if (!wantsUsage && !wantsAgents && !wantsBuilds && !wantsTank) return
+  if (!wantsUsage && !wantsAgents && !wantsBuilds) return
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
@@ -103,14 +101,9 @@ export const registerBand: Feature = (on, options) => {
     const build = head === null ? null : viewOf(head, now)
     const chips = head === null ? [] : othersOf(builds, head, now)
 
-    // Tank only takes space on the band when something there wants a person.
-    const tank = wantsTank ? await readTank($) : null
-    const needsYou = tank === null ? 0 : tank.instances.reduce((n, i) => n + i.waiting.length, 0)
-    const unreachable = tank === null ? 0 : tank.instances.filter(i => !i.ok).length
-    const unseen = tank === null ? 0 : unseenOf(tank)
 
     // Nothing to report from any of the four.
-    const quiet = windowList.length === 0 && view === null && !busy && build === null && unseen === 0
+    const quiet = windowList.length === 0 && view === null && !busy && build === null
 
     // The engine hands over the context it is carrying at session.start but
     // the rate-limit windows only on a later measurement, so a fresh session
@@ -159,7 +152,7 @@ export const registerBand: Feature = (on, options) => {
               <Text color={EMPTY}>{p.off}</Text>
             </>
           ) : (
-            <Svg source={meter(p.left, p.color, EMPTY)} alt={`${p.left}% left`} {...METER_SIZE} />
+            <Svg source={capsule(p.left, p.color)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
           )}
           <Text color={p.color} bold> {p.left}% left</Text>
           {p.isLow ? <Text backgroundColor={BAD} color={INK} bold>{' LOW '}</Text> : null}
@@ -181,7 +174,7 @@ export const registerBand: Feature = (on, options) => {
                 <Text color={EMPTY}>{p.off}</Text>
               </>
             ) : (
-              <Svg source={meter(p.left, p.color, EMPTY)} alt={`${p.left}% left`} {...METER_SIZE} />
+              <Svg source={capsule(p.left, p.color)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
             )}
           </Box>
           <Box flexDirection="row">
@@ -196,21 +189,12 @@ export const registerBand: Feature = (on, options) => {
 
     const windows = windowList.map(isWide ? wideWindow : blockWindow)
 
-    const tankChip =
-      needsYou > 0 || unreachable > 0 ? (
-        <Box key="tank" flexDirection="row" flexShrink={0} marginRight={3}>
-          <Text color={TEXT} bold>TANK </Text>
-          {needsYou > 0 ? <Text backgroundColor={WARN} color={INK} bold>{` ${needsYou} need you `}</Text> : null}
-          {needsYou > 0 && unreachable > 0 ? <Text color={DIM}> · </Text> : null}
-          {unreachable > 0 ? <Text color={BAD} bold>{unreachable} unreachable</Text> : null}
-          <Text color={DIM}> /tower-tank</Text>
-        </Box>
-      ) : null
 
     const crew =
       busy && agents !== null ? (
-        <Box key="crew" flexDirection="row" flexShrink={0} marginRight={3}>
-          <Text color={OK} bold>{agents.running} running</Text>
+        <Box key="crew" flexDirection="row" flexShrink={0} marginRight={3} alignItems="center">
+          {Svg === null ? null : <Svg source={orb(OK)} alt="" {...ORB_SIZE} />}
+          <Text color={OK} bold> {agents.running} running</Text>
           {agents.failed > 0 ? <Text color={BAD} bold> · {agents.failed} failed</Text> : null}
           <Text color={DIM}> · {agents.costUsd === null ? '$?' : usd(agents.costUsd)}</Text>
           <Text color={DIM}> /tower-agents</Text>
@@ -223,7 +207,14 @@ export const registerBand: Feature = (on, options) => {
       if (view.mode === 'warm') {
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
-            <Text backgroundColor={OK} color={INK} bold>{' WARM '}</Text>
+            {Svg === null ? (
+              <Text backgroundColor={OK} color={INK} bold>{' WARM '}</Text>
+            ) : (
+              <Box flexDirection="row" alignItems="center">
+                <Svg source={orb(OK)} alt="" {...ORB_SIZE} />
+                <Text color={OK} bold> WARM</Text>
+              </Box>
+            )}
             <Text color={DIM}> {Math.max(0, TTL_MIN - view.idleMin)}m left</Text>
           </Box>
         )
@@ -231,7 +222,14 @@ export const registerBand: Feature = (on, options) => {
         const cost = rewarmCost(view.model, view.tokens)
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0} marginRight={3}>
-            <Text backgroundColor={WARN} color={INK} bold>{' COLD '}</Text>
+            {Svg === null ? (
+              <Text backgroundColor={WARN} color={INK} bold>{' COLD '}</Text>
+            ) : (
+              <Box flexDirection="row" alignItems="center">
+                <Svg source={orb(WARN)} alt="" {...ORB_SIZE} />
+                <Text color={WARN} bold> COLD</Text>
+              </Box>
+            )}
             <Text color={DIM}> {since(view.idleMs)} idle</Text>
             <Text color={DIM}> · </Text>
             <Text color={TEXT} bold>{cost === null ? '$?' : usd(cost)}</Text>
@@ -272,7 +270,6 @@ export const registerBand: Feature = (on, options) => {
       <Box key="row" flexDirection="row" paddingX={1}>
         {label}
         {windows}
-        {tankChip}
         {crew}
         {cache}
         {ctx}
@@ -293,8 +290,7 @@ export const registerBand: Feature = (on, options) => {
               {windows}
             </Box>,
             <Box key="tail" flexDirection="row" paddingX={1}>
-              {tankChip}
-              {crew}
+                    {crew}
               {cache}
               {cost}
             </Box>,

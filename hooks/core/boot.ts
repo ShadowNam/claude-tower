@@ -2,8 +2,6 @@ import { startAgents } from './agents'
 import { noteFailures, startDiag } from './diag'
 import { reasonOf } from './fmt'
 import type { Feature } from './kinds'
-import { startNotify } from './notify'
-import { startTank } from './tank'
 import { startUsage } from './usage'
 import { startWatch } from './watch'
 
@@ -32,11 +30,6 @@ export const registerBoot: Feature = (on, options) => {
       failed.push(`diag: ${reasonOf(err, 300)}`)
     }
 
-    try {
-      await startNotify($)
-    } catch (err) {
-      failed.push(`notify: ${reasonOf(err, 300)}`)
-    }
 
     if (options.usageBand === true) {
       try {
@@ -62,13 +55,6 @@ export const registerBoot: Feature = (on, options) => {
       failed.push(`builds: ${reasonOf(err, 300)}`)
     }
 
-    try {
-      await startTank($, options)
-    } catch (err) {
-      // A Tank that cannot be reached at startup is the panel's news, not the
-      // session's, but it is still worth naming in the diagnostics.
-      failed.push(`tank: ${reasonOf(err, 300)}`)
-    }
 
     if (failed.length > 0) {
       try {

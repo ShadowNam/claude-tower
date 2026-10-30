@@ -53,12 +53,6 @@ finish. Sources, in the order they are trusted: a `.buildstatus.json` marker a b
 writes, a GitHub Actions run, and a shell command run in this session. A failure shows its
 first error line and holds the row until something else needs it.
 
-**Tank** (`/tower-tank`) — what each of your Tank instances is doing, what is waiting on an
-answer from you, what failed in the last day, and how far the build queues are. Optionally a
-watchdog that resumes tasks killed by a transient error.
-
-**WhatsApp** — a message when something you cared about changed. Off until you turn it on.
-
 ## Settings
 
 Everything is in `/config`, under Tower.
@@ -68,61 +62,21 @@ Everything is in `/config`, under Tower.
 | Usage band | on | |
 | Agents panel | on | |
 | Build status bar | on | |
-| Tank panel | off | Needs the instance names below |
-| Tank instances | `tank` | MCP server names, as `/mcp` lists them |
 | GitHub token | empty | Actions read access, for CI progress. Kept in your OS keychain |
-| Send WhatsApp notifications | **off** | The master switch |
-| WhatsApp MCP server | empty | Your gateway's server name — see below |
-| Notification level | `silent` | `silent`, `milestones`, `verbose`, `debug` |
-| Quiet hours | `22:00-07:00` | Held until morning, except what means work has stopped |
-| Tank watchdog | `alert` | `off`, `alert`, `resume` |
 
 Changing any of these in `/config` reloads the mod with the new values. Nothing has to
 be restarted. Changing them with `claude plugin configure` from a shell writes the same
 file from another process, which the running session does not re-read — that one needs
 the app restarted.
 
-### Naming an MCP server
-
-The Tank and WhatsApp settings take server names, and which spelling works depends on
-where the server came from:
-
-- **Configured yourself** (`claude mcp add`, `.mcp.json`) — the name you gave it:
-  `tank`, `tank-prod`.
-- **A claude.ai connector** — its **id**, not its title. A connector called
-  "WhatsApp Gateway" is addressed as `aa465f29-6c9e-4063-966d-507df8b7208b`, which is
-  the same string its tools carry: `mcp__aa465f29-…__whatsapp_send_message`. The title
-  does not resolve.
-
-If a name is wrong, `/tower-notify test` says so and names what it tried. Automatic
-sends cannot, so test after any change.
 
 ## Commands
 
 - `/tower` — what loaded, what is switched on, where it draws, and anything that
   failed to start
 - `/tower-agents` — open or close the agents panel
-- `/tower-tank` — open or close the Tank panel
 - `/tower-hook` — print the snippet that lets a build script report its own progress
-- `/tower-notify` — what would be sent; `/tower-notify test` sends the first message
 
-## Auto mode switches off everything that needs an MCP server
-
-In a session whose permission mode is **auto**, `$.mcp.call` is refused:
-
-> the server-side auto mode classifier gave no verdict for `<tool>`: the request
-> that produced this action did not ask for one
-
-Auto mode is evaluated per model request, and a mod's call belongs to no request —
-it comes from a timer or a slash command, with no model turn behind it to judge. So
-it fails closed, by design, and no setting here changes that.
-
-What stops working: **Tank polling**, the **Tank watchdog** and **WhatsApp
-notifications**. What keeps working: the **usage band**, the **agents panel** and the
-**build bar**, none of which leave the session.
-
-Switch the session's permission mode to anything else and they come back. Outside
-auto mode a mod's call carries the engine's own credentials and raises no prompt.
 
 ## If you see nothing
 
@@ -142,29 +96,7 @@ because the diagnostics are seeded before anything else starts.
 Each feature starts on its own. One that throws is skipped alone and named in
 `/tower`, rather than taking the other three down with it.
 
-## About the WhatsApp notifications
 
-This is the only part of Tower that does something irreversible, so the limits are built in
-rather than configured:
-
-- It is **off** until you turn it on, and `silent` even then.
-- It only ever sends **to your own number**. The recipient is not a setting, because a
-  setting could come from a file in a repository.
-- Every message is a **fixed template** filled with local facts. Nothing a model composed is
-  ever sent, so a prompt injection has nothing to say through it.
-- Anything that looks like a credential is stripped before a message is built.
-- The **first message is one you send yourself**, with `/tower-notify test`.
-- Throttled: five minutes between messages of a kind, thirty before an identical one
-  repeats, fifteen per session, sixty per day.
-
-## About the Tank watchdog
-
-In the default `alert` mode it only tells you. Set to `resume` it will reply `[watchdog
-resume]` to a stalled task, under limits that cannot be configured away: only for transient
-failures (connection lost, a 5xx, a restart), never on `main`, `master`, `production` or a
-release branch, **twice per task ever**, five minutes apart, at most five an hour across
-everything, and every resume sends a message. The counts live in the store, so restarting
-the session does not reset them.
 
 ## Developing
 
@@ -196,3 +128,11 @@ Tower's agent-tracking approach — recording the engine's `agentId` at spawn an
 every later event on it — follows the one worked out in
 [savvy-progress](https://github.com/johnnyvizz/claude-kit), and the price table is derived
 from it. Both are MIT; see NOTICE.
+
+## What was taken out
+
+Tower watches the session you are sitting in. Three features did not — Tank
+polling, the Tank watchdog and WhatsApp notifications all watched a machine
+somewhere else — so they were lifted out whole into [`salvage/`](salvage/),
+with their tests, types, settings and the reasoning behind their safety
+rules. Nothing there is loaded. Its README says how to revive them.

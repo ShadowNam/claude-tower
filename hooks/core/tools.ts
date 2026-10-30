@@ -1,7 +1,6 @@
 import { detailOf, noteToolEnd, noteToolStart } from './agents'
 import { isWorthTelling, noteBuildEnd, noteBuildStart } from './builds'
 import type { Feature } from './kinds'
-import { notify } from './notify'
 
 /**
  * The mod's one tool.call hook. The agents panel wants every call, to show
@@ -49,17 +48,8 @@ export const registerTools: Feature = (on, options) => {
       const out = typeof result === 'object' && result !== null ? (result as { result?: unknown }).result : undefined
       const done = await noteBuildEnd($, build, isError, typeof out === 'string' ? out : '')
 
-      // A build short enough to watch finish is not worth a message.
-      if (done !== null) {
-        const now = await $.clock.now()
-        if (isWorthTelling(done, now)) {
-          await notify($, options, isError ? 'build.failed' : 'build.finished', `${done.project}|${done.target}`, {
-            project: done.project,
-            detail: done.target,
-            extra: done.errorLine,
-          })
-        }
-      }
+      // noteBuildEnd files the run; the bar reads it from state.
+      void done
     }
 
     return result

@@ -67,12 +67,30 @@ Everything is in `/config`, under Tower.
 | Tank instances | `tank` | MCP server names, as `/mcp` lists them |
 | GitHub token | empty | Actions read access, for CI progress. Kept in your OS keychain |
 | Send WhatsApp notifications | **off** | The master switch |
-| WhatsApp MCP server | empty | Your gateway's name, as `/mcp` lists it |
+| WhatsApp MCP server | empty | Your gateway's server name — see below |
 | Notification level | `silent` | `silent`, `milestones`, `verbose`, `debug` |
 | Quiet hours | `22:00-07:00` | Held until morning, except what means work has stopped |
 | Tank watchdog | `alert` | `off`, `alert`, `resume` |
 
-Changing any of these reloads the mod with the new values. Nothing has to be restarted.
+Changing any of these in `/config` reloads the mod with the new values. Nothing has to
+be restarted. Changing them with `claude plugin configure` from a shell writes the same
+file from another process, which the running session does not re-read — that one needs
+the app restarted.
+
+### Naming an MCP server
+
+The Tank and WhatsApp settings take server names, and which spelling works depends on
+where the server came from:
+
+- **Configured yourself** (`claude mcp add`, `.mcp.json`) — the name you gave it:
+  `tank`, `tank-prod`.
+- **A claude.ai connector** — its **id**, not its title. A connector called
+  "WhatsApp Gateway" is addressed as `aa465f29-6c9e-4063-966d-507df8b7208b`, which is
+  the same string its tools carry: `mcp__aa465f29-…__whatsapp_send_message`. The title
+  does not resolve.
+
+If a name is wrong, `/tower-notify test` says so and names what it tried. Automatic
+sends cannot, so test after any change.
 
 ## Commands
 

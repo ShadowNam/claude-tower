@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { canSend, dayOf, decide, EMPTY_POLICY, inQuietHours, levelOf, record, render, wants } from '../hooks/core/notify'
+import { canSend, dayOf, decide, EMPTY_POLICY, gatewayReason, inQuietHours, levelOf, record, render, wants } from '../hooks/core/notify'
 
 import type { Policy } from '../hooks/core/notify'
 
@@ -93,4 +93,21 @@ test('the test message says what it is', async () => {
   expect(render('test', {}, T0).startsWith('*Tower is connected*')).toBe(true)
   // It is the one message that no level gates, because a person asked for it.
   expect(wants('silent', 'test')).toBe(true)
+})
+
+test('a gateway refusal is reported whole, including the server it tried', async () => {
+  // The engine's own wording when the configured server name resolves to
+  // nothing. At 80 characters this was cut before the name, which is the only
+  // part that says what to fix.
+  const real = new Error(
+    '$.mcp.call: no connected MCP tool "whatsapp_send_message" on a server named "WhatsApp Gateway"',
+  )
+  const reason = gatewayReason(real)
+  expect(reason).toContain('whatsapp_send_message')
+  expect(reason).toContain('WhatsApp Gateway')
+
+  // Anything key-shaped still goes, and a thrown non-error still reads plainly.
+  expect(gatewayReason(new Error('refused: Bearer ghp_abcdefghijklmnop'))).toBe('refused: Bearer <redacted>')
+  expect(gatewayReason('nope')).toBe('the gateway refused')
+  expect(gatewayReason(new Error('   '))).toBe('the gateway refused')
 })

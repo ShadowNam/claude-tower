@@ -1,6 +1,6 @@
 {
   "name": "tower",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "One place to see what a Claude session is costing, what its agents are doing, how far the build is, and whether Tank is healthy.",
   "author": { "name": "Shadow" },
   "license": "MIT",

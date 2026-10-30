@@ -266,7 +266,7 @@ export async function notify(
   try {
     await $.mcp.call(String(options['whatsappServer']), 'whatsapp_send_message', { text, wait: false })
   } catch (err) {
-    return { send: false, reason: err instanceof Error ? err.message.slice(0, 80) : 'the gateway refused' }
+    return { send: false, reason: gatewayReason(err) }
   }
 
   sessionCount += 1
@@ -276,6 +276,24 @@ export async function notify(
     // The message went; losing the record only risks one repeat.
   }
   return { send: true, reason: 'sent' }
+}
+
+/**
+ * Room for the whole of what the gateway said.
+ *
+ * This was 80, which cut the engine's "no connected MCP tool … on a server
+ * named …" exactly where it names the server — the one part of the message
+ * that says what to change. A refusal is the only account a person gets of a
+ * send that did not happen, so it is kept whole.
+ */
+const REASON_MAX = 240
+
+/** What the gateway's refusal said, with anything key-shaped taken out. */
+export function gatewayReason(err: unknown): string {
+  if (!(err instanceof Error)) return 'the gateway refused'
+  const clean = redact(err.message).replace(/\s+/g, ' ').trim()
+  if (clean === '') return 'the gateway refused'
+  return clean.length > REASON_MAX ? `${clean.slice(0, REASON_MAX - 1)}…` : clean
 }
 
 /** How long a message of this kind stays worth sending. */

@@ -107,8 +107,30 @@ export type Fault = {
   at: number
 }
 
+/** The task list as the band shows it. */
+export type Plan = {
+  done: number
+  total: number
+  /** The step in progress, truncated; empty when none is marked. */
+  now: string
+  finished: boolean
+}
+
+/** How fast the model has been answering, and whether that is unusual. */
+export type Rate = {
+  /** Recent turns' tokens per second, trailing and capped. */
+  recent: readonly number[]
+  /** Consecutive slow turns; one slow turn is noise. */
+  slowRuns: number
+  isSlow: boolean
+  /** The last turn's rate, or null before one could be measured. */
+  perSecond: number | null
+}
+
 /** What the session knows about its own shape, beyond the usage figures. */
 export type Shape = {
+  /** Null until a turn long enough to measure has finished. */
+  rate: Rate | null
   /** The effort the turn ran at, after any silent downgrade. */
   effort: string
   /** Set while a compaction is running, or expected. */
@@ -227,6 +249,7 @@ declare module 'claude-code' {
       builds: readonly Build[]
       edits: Edits
       shape: Shape
+      plan: Plan | null
     }
   }
 }

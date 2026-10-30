@@ -5,7 +5,7 @@ import { CAPSULE_SIZE, capsule, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
 import { FAULT_MS, faultWord } from '../core/shape'
-import { readAgents, readBuilds, readEdits, readShape, readTick, readUsage } from '../core/state'
+import { readAgents, readBuilds, readEdits, readPlan, readShape, readTick, readUsage } from '../core/state'
 import { cacheView, headroom, TTL_MIN } from '../core/usage'
 import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
@@ -102,6 +102,7 @@ export const registerBand: Feature = (on, options) => {
     const fault =
       shape?.fault != null && now - shape.fault.at < FAULT_MS ? faultWord(shape.fault.kind) : null
 
+    const plan = wantsUsage ? await readPlan($) : null
     const builds = wantsBuilds ? await readBuilds($) : []
     const head = headlineOf(builds, now)
     const build = head === null ? null : viewOf(head, now)
@@ -141,6 +142,9 @@ export const registerBand: Feature = (on, options) => {
     // The terminal's table still lists Svg, so ask the surface, not the table.
     const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 100
+    // What the band may take before the engine starts scrolling it. The build
+    // rows and the plan row are the ones that can be given up.
+    const maxRows = typeof e.props.maxRows === 'number' && e.props.maxRows > 0 ? e.props.maxRows : 99
     const isWide = columns >= WIDE_AT
     const isStacked = !isWide && columns >= STACKED_AT
     const cells = isWide || isStacked ? CELLS : TIGHT_CELLS
@@ -173,6 +177,25 @@ export const registerBand: Feature = (on, options) => {
           {p.isLow ? <Text backgroundColor={BAD} color={INK} weight="bold">{' LOW '}</Text> : null}
           {p.reset === '' ? null : <Text color={DIM}> · {p.reset}</Text>}
           {p.empty === '' ? null : <Text color={WARN} weight="bold"> · out ~{p.empty}</Text>}
+          {/* Drawn over the row rather than in it, so hovering moves nothing. */}
+          <Box
+            position="absolute"
+            top={1}
+            left={0}
+            display="none"
+            hover={{ scope: `w${i}`, display: 'flex' }}
+            flexDirection="column"
+            paddingX={1}
+            borderStyle="round"
+            borderColor={p.color}
+            backgroundColor={BG}
+          >
+            <Text color={p.color} weight="bold">{p.name} · {Math.round(w.percentUsed)}% used</Text>
+            {p.reset === '' ? null : <Text color={DIM}>resets {p.reset}</Text>}
+            <Text color={p.empty === '' ? DIM : WARN}>
+              {p.empty === '' ? 'not on course to run out' : `on course to run out ~${p.empty}`}
+            </Text>
+          </Box>
         </Box>
       )
     }
@@ -317,6 +340,14 @@ export const registerBand: Feature = (on, options) => {
         </Box>
       )
 
+    const slowChip =
+      shape?.rate == null || !shape.rate.isSlow || shape.rate.perSecond === null ? null : (
+        <Box key="slow" flexDirection="row" flexShrink={0} alignItems="center" gap={1}>
+          <Text backgroundColor={WARN} color={INK} weight="bold">{' API SLOW '}</Text>
+          <Text color={DIM} tabular>{Math.round(shape.rate.perSecond)} tok/s</Text>
+        </Box>
+      )
+
     const effortChip =
       shape?.effort === undefined || shape.effort === '' || shape.effort === 'medium' ? null : (
         <Box key="effort" flexShrink={0}>
@@ -339,6 +370,7 @@ export const registerBand: Feature = (on, options) => {
       <Box key="row" flexDirection="row" paddingX={1} gap={3} alignItems="center">
         {alarm}
         {compacting}
+        {slowChip}
         {label}
         {windows}
         {crew}
@@ -350,6 +382,24 @@ export const registerBand: Feature = (on, options) => {
         {waiting}
       </Box>
     )
+
+    const planRow =
+      plan === null || plan.total === 0 || plan.finished ? null : (
+        <Box key="plan" flexDirection="row" paddingX={1} gap={1} alignItems="center">
+          <Box flexShrink={0}>
+            <Text color={TEXT} weight="bold">PLAN</Text>
+          </Box>
+          {Svg === null ? null : (
+            <Svg
+              source={capsule((plan.done / plan.total) * 100, YELLOW, `${plan.done} of ${plan.total} done`)}
+              alt={`${plan.done} of ${plan.total}`}
+              {...CAPSULE_SIZE}
+            />
+          )}
+          <Text color={YELLOW} weight="bold" tabular>{plan.done}/{plan.total}</Text>
+          {plan.now === '' ? null : <Text color={DIM} wrap="truncate-end"> · {plan.now}</Text>}
+        </Box>
+      )
 
     // Narrow: the cache and the cost get a line of their own under the blocks.
     // With no windows there is nothing to stack, so the one row serves at any
@@ -388,11 +438,21 @@ export const registerBand: Feature = (on, options) => {
             <Text color={TEXT} weight="bold">BUILD</Text>
           </Box>
           {b.state === 'running' ? (
-            <Box flexDirection="row" flexShrink={0}>
-              {bar === null ? null : <Text color={OK}>{bar.on}</Text>}
-              {bar === null ? null : <Text color={EMPTY}>{bar.off}</Text>}
+            <Box flexDirection="row" flexShrink={0} alignItems="center" gap={1}>
+              {est.progress === null || Svg === null ? (
+                <>
+                  {bar === null ? null : <Text color={OK}>{bar.on}</Text>}
+                  {bar === null ? null : <Text color={EMPTY}>{bar.off}</Text>}
+                </>
+              ) : (
+                <Svg
+                  source={capsule(est.progress * 100, OK, `${b.project}: ${build.eta}`, true)}
+                  alt={`${Math.round(est.progress * 100)}% built`}
+                  {...CAPSULE_SIZE}
+                />
+              )}
               {est.progress === null ? null : (
-                <Text color={OK} weight="bold"> {Math.round(est.progress * 100)}%</Text>
+                <Text color={OK} weight="bold" tabular>{Math.round(est.progress * 100)}%</Text>
               )}
               <Text color={est.stage === 'normal' ? TEXT : WARN} weight="bold"> {build.eta}</Text>
               <Text color={DIM}> {MARK[est.confidence] ?? ''} · {build.elapsed} elapsed</Text>
@@ -440,11 +500,19 @@ export const registerBand: Feature = (on, options) => {
       }
     }
 
+    // The engine scrolls a tree taller than the band's slot, which hides the
+    // very rows that were added to be seen. So the optional rows are dropped
+    // from the bottom until what is left fits.
+    const optional: unknown[] = [...buildRows]
+    if (planRow !== null) optional.push(planRow)
+    const roomLeft = Math.max(0, maxRows - rows.length)
+    const kept = optional.slice(0, roomLeft)
+
     return (
       <Box flexDirection="column">
         <Box flexDirection="column" backgroundColor={BG}>
           {rows}
-          {buildRows}
+          {kept}
         </Box>
         {below}
       </Box>

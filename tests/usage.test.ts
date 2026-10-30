@@ -1,6 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import { project, projectWithin, trim } from '../hooks/core/burn'
+import { isPlanTool, planOf } from '../hooks/core/plan'
+import { fold as foldRate, median, rateOf } from '../hooks/core/rate'
 import { priceOf, rewarmCost } from '../hooks/core/prices'
 import { cacheView, compactionOf, fold, headroom } from '../hooks/core/usage'
 
@@ -161,4 +163,66 @@ test('nothing is claimed about compaction unless the engine said it', async () =
   expect(headroom({ max: 200_000, used: 10, firesAt: null, isEnabled: true })).toBe(null)
   // Already past it is not a negative distance; it is nothing worth saying.
   expect(headroom({ max: 200_000, used: 170_000, firesAt: 160_000, isEnabled: true })).toBe(null)
+})
+
+test('a short turn says nothing about how fast the API is', async () => {
+  // A two-token answer that took a second reads as 2 tok/s and means latency,
+  // not throughput. Crying wolf on those is how a warning gets ignored.
+  expect(rateOf(800, 2000)).toBe(null)
+  expect(rateOf(10_000, 40)).toBe(null)
+  expect(rateOf(Number.NaN, 500)).toBe(null)
+  // A turn long enough to mean something gives its rate.
+  expect(rateOf(10_000, 500)).toBe(50)
+})
+
+test('slow means slow for this session, and sustained', async () => {
+  let r = null
+  // Five ordinary turns at about 50 tok/s.
+  for (const v of [50, 52, 48, 51, 49]) r = foldRate(r, v)
+  expect(r?.isSlow).toBe(false)
+
+  // One slow turn is noise, not news.
+  r = foldRate(r, 20)
+  expect(r?.slowRuns).toBe(1)
+  expect(r?.isSlow).toBe(false)
+
+  // Two in a row is worth saying.
+  r = foldRate(r, 18)
+  expect(r?.isSlow).toBe(true)
+
+  // And one good turn clears it, rather than leaving a stale warning up.
+  r = foldRate(r, 49)
+  expect(r?.slowRuns).toBe(0)
+  expect(r?.isSlow).toBe(false)
+})
+
+test('nothing is claimed about speed before there is a baseline', async () => {
+  // Four turns is not enough to have a median worth comparing against, so even
+  // a very slow one raises nothing.
+  let r = null
+  for (const v of [50, 50, 50, 2]) r = foldRate(r, v)
+  expect(r?.isSlow).toBe(false)
+  expect(median([])).toBe(null)
+  expect(median([3, 1, 2])).toBe(2)
+  expect(median([4, 1, 3, 2])).toBe(2.5)
+})
+
+test('a plan is read from whichever host wrote it', async () => {
+  const todos = { todos: [
+    { content: 'one', status: 'completed' },
+    { content: 'two', status: 'in_progress' },
+    { content: 'three', status: 'pending' },
+  ] }
+  expect(planOf(todos)).toEqual({ done: 1, total: 3, now: 'two', finished: false })
+
+  // The desktop app spells the same thing differently.
+  expect(planOf({ items: [{ content: 'a', status: 'completed' }] }))
+    .toEqual({ done: 1, total: 1, now: '', finished: true })
+
+  // An advance or done update names no steps, so the last reading stands.
+  expect(planOf({ advance: true })).toBe(null)
+  expect(planOf({ items: [] })).toBe(null)
+  expect(isPlanTool('TodoWrite')).toBe(true)
+  expect(isPlanTool('mcp__ccd_turn__update_plan')).toBe(true)
+  expect(isPlanTool('Bash')).toBe(false)
 })

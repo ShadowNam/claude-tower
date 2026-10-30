@@ -52,6 +52,17 @@ function styles(id: string, alive: boolean): string {
   )
 }
 
+/** A sheen travelling the length of a bar, for work that is genuinely moving. */
+function sweep(id: string, w: number): string {
+  return (
+    '<style>' +
+    `@keyframes ${id}w{from{transform:translateX(${-w}px)}to{transform:translateX(${w}px)}}` +
+    `.${id}s{animation:${id}w 1.9s linear infinite}` +
+    `@media (prefers-reduced-motion: reduce){.${id}s{animation:none;opacity:0}}` +
+    '</style>'
+  )
+}
+
 /** Shown size in CSS pixels, and the 2× box the shapes are drawn in. */
 const METER_W = 84
 const METER_H = 14
@@ -165,7 +176,7 @@ function profile(id: string, base: Rgb): string {
  * the empty floor, and a bright leading edge. It is the one edge in the whole
  * drawing that carries the reading, so it gets the budget.
  */
-export function capsule(leftPercent: number, color: string, title = ''): string {
+export function capsule(leftPercent: number, color: string, title = '', moving = false): string {
   const id = uid()
   const base = parse(color)
   const fill = (clamp(leftPercent) / 100) * TRACK_W
@@ -185,6 +196,7 @@ export function capsule(leftPercent: number, color: string, title = ''): string 
     METER_H,
     [
       title === '' ? '' : `<title>${title.replace(/[<>&]/g, '')}</title>`,
+      moving && fill > 2 ? sweep(id, TRACK_W) : '',
       '<defs>',
       `<clipPath id="${id}k"><rect x="${TRACK_X}" y="${TRACK_Y}" width="${TRACK_W}" height="${TRACK_H}" rx="${TRACK_R}"/></clipPath>`,
       // The floor is opaque, so the drawing never depends on what is behind it.
@@ -212,6 +224,13 @@ export function capsule(leftPercent: number, color: string, title = ''): string 
       '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>',
       '</linearGradient>',
       // Sub-perceptual dither: breaks a contour before it can form.
+      moving
+        ? `<linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0">` +
+          '<stop offset="0" stop-color="#ffffff" stop-opacity="0"/>' +
+          '<stop offset="0.5" stop-color="#ffffff" stop-opacity="0.22"/>' +
+          '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>' +
+          '</linearGradient>'
+        : '',
       `<pattern id="${id}d" width="4" height="4" patternUnits="userSpaceOnUse">`,
       '<rect x="0" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.05"/>',
       '<rect x="2" y="2" width="1" height="1" fill="#000000" fill-opacity="0.05"/>',
@@ -227,6 +246,9 @@ export function capsule(leftPercent: number, color: string, title = ''): string 
       `<rect x="${TRACK_X}" y="${TRACK_Y}" width="${TRACK_W}" height="7" fill="url(#${id}l)"/>`,
       `<rect x="${TRACK_X}" y="${TRACK_Y + TRACK_H - 2}" width="${TRACK_W}" height="2" fill="#ffffff" fill-opacity="0.07"/>`,
       `<rect x="${TRACK_X}" y="${TRACK_Y}" width="${TRACK_W}" height="${TRACK_H}" fill="url(#${id}d)"/>`,
+      moving && fill > 2
+        ? `<rect class="${id}s" x="${TRACK_X}" y="${TRACK_Y}" width="26" height="${TRACK_H}" fill="url(#${id}g)"/>`
+        : '',
       // Quarter notches: a scale, without a glyph.
       '<g fill="#000000" fill-opacity="0.3" shape-rendering="crispEdges">',
       `<rect x="42" y="${TRACK_Y}" width="2" height="${TRACK_H}"/>`,

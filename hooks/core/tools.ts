@@ -1,6 +1,7 @@
 import { detailOf, noteToolEnd, noteToolStart } from './agents'
 import { isWorthTelling, noteBuildEnd, noteBuildStart } from './builds'
 import { isWriter, noteEdit } from './edits'
+import { notePlan } from './plan'
 import type { Feature } from './kinds'
 
 /**
@@ -24,6 +25,9 @@ export const registerTools: Feature = (on, options) => {
     const input = e as unknown as Readonly<Record<string, unknown>>
 
     if (wantsAgents) await noteToolStart($, e.agentId, tool, detailOf(tool, input))
+    // The arguments carry the list; whether the call succeeds does not
+    // change what it said.
+    if (wantsEdits && e.agentId === undefined) await notePlan($, tool, input)
 
     // Only a shell command can be a build, and only some of those are.
     let build: string | null = null

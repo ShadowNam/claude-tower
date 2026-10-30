@@ -1,5 +1,6 @@
 import { noteComplete, noteStep } from './agents'
 import type { Feature } from './kinds'
+import { noteRate } from './rate'
 import { noteEffort } from './shape'
 import { completeCache, stampCache } from './usage'
 
@@ -51,6 +52,7 @@ export const registerTurns: Feature = (on, options) => {
 
     if (wantsUsage && e.agentId === undefined) {
       await completeCache($, e.usage?.model ?? null, e.durationMs)
+      await noteRate($, e.durationMs, Number(e.usage?.output_tokens ?? 0))
     }
 
     return done

@@ -173,6 +173,11 @@ export const registerBand: Feature = (on, options) => {
     const chosen = picked === '' ? layout : layoutOf(picked)
     const form: ReturnType<typeof layoutOf> = Svg === null ? 'rows' : chosen
 
+    // Shaped exactly as the version that last drew: a Box holding the mark
+    // and one Button, and nothing else. Adding a sibling Text here is the only
+    // change this band has ever made that emptied it on the real surface while
+    // every test and the validator passed — so the layout's name goes in the
+    // label rather than in an element of its own.
     const label = (
       <Box key="label" flexShrink={0} flexDirection="row" alignItems="center" gap={1}>
         {Svg === null ? null : (
@@ -180,12 +185,9 @@ export const registerBand: Feature = (on, options) => {
             <Svg source={mark(ORANGE)} alt="Tower" {...MARK_SIZE} />
           </Box>
         )}
-        {/* label only, no children: a Button with Text children draws fine in
-            a Pane and refuses the whole tree here, and a refused tree takes
-            the entire band with it. The layout's name sits beside it. */}
         <Button
           key="cycle"
-          label="USAGE"
+          label={`USAGE ${form}`}
           plain
           dimColor
           hotkey="2"
@@ -198,7 +200,6 @@ export const registerBand: Feature = (on, options) => {
             void $.store.set('layout', after)
           }}
         />
-        <Text size="caption" color={DIM}>{form}</Text>
       </Box>
     )
 

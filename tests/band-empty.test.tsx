@@ -42,7 +42,7 @@ test('with figures but no windows yet the band still holds its row', async ($, o
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
-    expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
+    expect((await ui.find({ type: 'Button', label: /^USAGE / })) !== undefined).toBe(true)
     // The context it is carrying is shown whatever the width, being all there is.
     expect((await ui.find({ type: 'Text', text: /32%/ }))?.text).toBe('32%')
     // And it says plainly that the windows are the missing part.
@@ -60,7 +60,7 @@ test('the bare row survives a narrow terminal', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal', props: { ...BAND.props, bodyColumns: 60 } })
-  expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
+  expect((await ui.find({ type: 'Button', label: /^USAGE / })) !== undefined).toBe(true)
   expect((await ui.find({ type: 'Text', text: /25%/ }))?.text).toBe('25%')
   await ui.unmount()
 })

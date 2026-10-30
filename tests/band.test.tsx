@@ -41,7 +41,7 @@ test('the band draws each window with what is left of it', { options: { bandLayo
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
 
-    expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
+    expect((await ui.find({ type: 'Button', label: /^USAGE / })) !== undefined).toBe(true)
     // 31% used of the seven-day window leaves 69.
     expect((await ui.find({ type: 'Text', text: /69% left/ }))?.text).toBe(' 69% left')
     expect((await ui.find({ type: 'Text', text: /85% left/ }))?.text).toBe(' 85% left')
@@ -145,8 +145,8 @@ test('the band names the layout it is drawing, and cycles on a press', async ($,
 
   // The control is the band's own label, so it costs no columns of its own,
   // and the layout it is drawing is written beside it.
-  expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
-  expect((await ui.find({ type: 'Text', text: /^dials$/ }))?.text).toBe('dials')
+  expect((await ui.find({ type: 'Button', label: /^USAGE / })) !== undefined).toBe(true)
+  expect((await ui.find({ type: 'Button', label: 'USAGE dials' })) !== undefined).toBe(true)
 
   // A press writes state, so the band redraws, and the store, so the choice
   // outlives the session. It used to call config.set, which answers { deny }
@@ -154,7 +154,7 @@ test('the band names the layout it is drawing, and cycles on a press', async ($,
   // press ignored the answer, so a refusal looked like a dead button.
   await ui.press({ key: 'cycle' })
   expect(kept['layout']).toBe('hero')
-  expect((await ui.find({ type: 'Text', text: /^hero$/ }))?.text).toBe('hero')
+  expect((await ui.find({ type: 'Button', label: 'USAGE hero' })) !== undefined).toBe(true)
 
   await ui.press({ key: 'cycle' })
   expect(kept['layout']).toBe('cards')

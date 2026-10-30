@@ -75,10 +75,18 @@ export type Compaction = {
   /** Where auto-compaction fires, when it is on and the engine names it. */
   firesAt: number | null
   isEnabled: boolean
+  /** The raw breakdown, kept so a drawing can name the heaviest thing in it. */
+  breakdown?: unknown
 }
 
 export type Usage = {
   windows: readonly UsageWindow[]
+  /** The cache's real lifetime once the engine has said; an hour until then. */
+  cacheTtlMs?: number
+  /** False while the lifetime is still Tower's assumption rather than a fact. */
+  isTtlLearned?: boolean
+  /** The engine's own estimate of re-caching, where it has given one. */
+  rewarmUsd?: number | null
   /** Null until a measurement has carried a breakdown. */
   compaction: Compaction | null
   cache: CacheFacts | null
@@ -107,6 +115,23 @@ export type Fault = {
   at: number
 }
 
+/** What the turn is doing, in the band's words. */
+export type Phase = 'thinking' | 'asking' | 'writing' | 'tool'
+
+/** Work still running outside the turn, as the engine last listed it. */
+export type Background = {
+  count: number
+  /** The kinds in it: shell, subagent, monitor, workflow. */
+  kinds: readonly string[]
+  /** Prompts scheduled to fire later. */
+  scheduled: number
+  /** When the list was taken; it is a turn-boundary snapshot, not live. */
+  at: number
+}
+
+/** The heaviest thing in the context that is not the conversation. */
+export type Weight = { name: string; tokens: number }
+
 /** The task list as the band shows it. */
 export type Plan = {
   done: number
@@ -131,6 +156,10 @@ export type Rate = {
 export type Shape = {
   /** Null until a turn long enough to measure has finished. */
   rate: Rate | null
+  /** What the turn is doing, from the engine's own spinner. */
+  phase?: Phase
+  /** Null when nothing is in flight; a snapshot taken at a turn boundary. */
+  background?: Background | null
   /** The effort the turn ran at, after any silent downgrade. */
   effort: string
   /** Set while a compaction is running, or expected. */

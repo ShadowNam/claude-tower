@@ -3,6 +3,7 @@ import type { Register } from 'claude-code'
 import { registerAgents } from './core/agents'
 import { registerBoot } from './core/boot'
 import { registerDiag } from './core/diag'
+import { registerEngine } from './core/engine'
 import { registerShape } from './core/shape'
 import { registerTools } from './core/tools'
 import { registerTurns } from './core/turns'
@@ -25,6 +26,7 @@ export const register: Register = (on, options) => {
   registerTurns(on, options)
   registerTools(on, options)
   registerShape(on, options)
+  registerEngine(on, options)
   registerDiag(on, options)
   registerUsage(on, options)
   registerAgents(on, options)

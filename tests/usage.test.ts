@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { project, projectWithin, trim } from '../hooks/core/burn'
+import { backgroundOf, heaviestOf, phaseOf, ttlOf } from '../hooks/core/engine'
 import { isPlanTool, planOf } from '../hooks/core/plan'
 import { fold as foldRate, median, rateOf } from '../hooks/core/rate'
 import { priceOf, rewarmCost } from '../hooks/core/prices'
@@ -225,4 +226,76 @@ test('a plan is read from whichever host wrote it', async () => {
   expect(isPlanTool('TodoWrite')).toBe(true)
   expect(isPlanTool('mcp__ccd_turn__update_plan')).toBe(true)
   expect(isPlanTool('Bash')).toBe(false)
+})
+
+test('the cache lifetime is the engine’s where it said it, an hour where it did not', async () => {
+  const STARTED = 1_800_000_000_000
+  const cache = { lastAt: STARTED, tokens: 1000, window: 200_000, model: 'claude-opus-5' }
+  const idle = (mins: number) => STARTED + mins * 60_000
+
+  // Ten minutes idle on a five-minute cache is cold. An assumed hour would
+  // have claimed fifty minutes of warmth left, which is not slightly wrong.
+  const short = cacheView(cache, idle(10), ttlOf('5m') ?? 0)
+  expect(short?.mode).toBe('cold')
+
+  // The same reading on an hour cache is warm, with the right countdown.
+  const long = cacheView(cache, idle(10), ttlOf('1h') ?? 0)
+  expect(long?.mode).toBe('warm')
+  expect(long?.leftMin).toBe(50)
+
+  // No lifetime given falls back to the hour rather than to zero.
+  expect(cacheView(cache, idle(10))?.mode).toBe('warm')
+
+  expect(ttlOf('5m')).toBe(300_000)
+  expect(ttlOf('1h')).toBe(3_600_000)
+  // Anything else is not guessed at.
+  expect(ttlOf('30m')).toBe(null)
+  expect(ttlOf(undefined)).toBe(null)
+})
+
+test('the heaviest thing named is one a person could switch off', async () => {
+  const heavy = heaviestOf({
+    mcpTools: [
+      { name: 'mcp__a__x', serverName: 'dropbox', tokens: 9_000 },
+      { name: 'mcp__a__y', serverName: 'dropbox', tokens: 9_000 },
+      { name: 'mcp__b__z', serverName: 'tank', tokens: 4_000 },
+    ],
+    categories: [
+      { name: 'Messages', tokens: 120_000, kind: 'used' },
+      { name: 'Memory files', tokens: 12_000, kind: 'used' },
+      { name: 'Free space', tokens: 60_000, kind: 'free' },
+    ],
+  })
+  // Tools are summed per server, which is the thing you would actually turn off.
+  expect(heavy).toEqual({ name: 'dropbox', tokens: 18_000 })
+
+  // The conversation is the largest thing in every context and the one thing
+  // nobody can act on, so it is never named.
+  expect(heaviestOf({ categories: [{ name: 'Messages', tokens: 500_000, kind: 'used' }] })).toBe(null)
+  expect(heaviestOf(null)).toBe(null)
+  expect(heaviestOf({})).toBe(null)
+})
+
+test('what the turn is doing, in words a band can hold', async () => {
+  expect(phaseOf('thinking')).toBe('thinking')
+  expect(phaseOf('tool-use')).toBe('tool')
+  expect(phaseOf('tool-input')).toBe('tool')
+  expect(phaseOf('responding')).toBe('writing')
+  expect(phaseOf('nonsense')).toBe(null)
+})
+
+test('background work is a snapshot, and says only what it saw', async () => {
+  const bg = backgroundOf(
+    [{ id: '1', type: 'shell', status: 'running', description: 'dev server' },
+     { id: '2', type: 'workflow', status: 'running', description: 'review' }],
+    [{ id: 'c1', schedule: '0 9 * * *', recurring: true, prompt: 'x' }],
+    1_800_000_000_000,
+  )
+  expect(bg.count).toBe(2)
+  expect(bg.kinds).toEqual(['shell', 'workflow'])
+  expect(bg.scheduled).toBe(1)
+
+  // Nothing in flight is not an empty list to draw; it is no chip at all.
+  expect(backgroundOf([], [], 0).count).toBe(0)
+  expect(backgroundOf(undefined, undefined, 0).scheduled).toBe(0)
 })

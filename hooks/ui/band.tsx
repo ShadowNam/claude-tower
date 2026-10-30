@@ -4,6 +4,7 @@ import { at, dots, since, tokens, until, usd } from '../core/fmt'
 import { CAPSULE_SIZE, capsule, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
+import { heaviestOf } from '../core/engine'
 import { FAULT_MS, faultWord } from '../core/shape'
 import { readAgents, readBuilds, readEdits, readPlan, readShape, readTick, readUsage } from '../core/state'
 import { cacheView, headroom, TTL_MIN } from '../core/usage'
@@ -89,7 +90,7 @@ export const registerBand: Feature = (on, options) => {
     await readTick($)
 
     const now = await $.clock.now()
-    const view = wantsUsage ? cacheView(u.cache, now) : null
+    const view = wantsUsage ? cacheView(u.cache, now, u.cacheTtlMs) : null
     const windowList = wantsUsage ? u.windows : []
 
     // The agents chip doubles as the panel's fallback: a pane opened unasked
@@ -128,6 +129,10 @@ export const registerBand: Feature = (on, options) => {
     const ctxUsed = u.compaction?.used ?? u.ledger.tokens
     const ctxPercent = ctxMax > 0 ? Math.round((ctxUsed / ctxMax) * 100) : null
     const left = headroom(u.compaction)
+    // Named only when one non-conversation thing is a real share of the
+    // window: "something is using 400 tokens" is not worth a column.
+    const heavy = heaviestOf(u.compaction?.breakdown)
+    const hog = heavy !== null && ctxMax > 0 && heavy.tokens / ctxMax > 0.12 ? heavy : null
 
     if (quiet && !(wantsUsage && knowsLedger)) return next(e)
 
@@ -266,11 +271,12 @@ export const registerBand: Feature = (on, options) => {
                 <Text color={OK} weight="bold"> WARM</Text>
               </Box>
             )}
-            <Text color={DIM} tabular> {Math.max(0, TTL_MIN - view.idleMin)}m left</Text>
+            <Text color={DIM} tabular> {view.leftMin}m left{u.isTtlLearned === true ? '' : '?'}</Text>
           </Box>
         )
       } else {
-        const cost = rewarmCost(view.model, view.tokens)
+        // The engine's own estimate where it has given one; ours otherwise.
+        const cost = u.rewarmUsd ?? rewarmCost(view.model, view.tokens)
         cache = (
           <Box key="cache" flexDirection="row" flexShrink={0}>
             {Svg === null ? (
@@ -340,6 +346,28 @@ export const registerBand: Feature = (on, options) => {
         </Box>
       )
 
+    // A turn-boundary snapshot, so it says bg and a count rather than
+    // claiming anything is definitely still running.
+    const bg = shape?.background ?? null
+    const bgChip =
+      bg === null ? null : (
+        <Box key="bg" flexDirection="row" flexShrink={0}>
+          {bg.count > 0 ? <Text color={DIM}>bg </Text> : null}
+          {bg.count > 0 ? <Text color={TEXT} tabular>{bg.count}</Text> : null}
+          {bg.count > 0 && bg.kinds.length > 0 ? <Text color={DIM}> {bg.kinds.join(', ')}</Text> : null}
+          {bg.scheduled > 0 ? (
+            <Text color={DIM}>{bg.count > 0 ? ' · ' : ''}{bg.scheduled} scheduled</Text>
+          ) : null}
+        </Box>
+      )
+
+    const phaseChip =
+      shape?.phase === undefined || !busy ? null : (
+        <Box key="phase" flexShrink={0}>
+          <Text color={DIM}>{shape.phase}</Text>
+        </Box>
+      )
+
     const slowChip =
       shape?.rate == null || !shape.rate.isSlow || shape.rate.perSecond === null ? null : (
         <Box key="slow" flexDirection="row" flexShrink={0} alignItems="center" gap={1}>
@@ -376,9 +404,17 @@ export const registerBand: Feature = (on, options) => {
         {crew}
         {cache}
         {ctx}
+        {hog === null ? null : (
+          <Box key="hog" flexDirection="row" flexShrink={0}>
+            <Text color={WARN} tabular>{tokens(hog.tokens)}</Text>
+            <Text color={DIM} wrap="truncate-end"> {hog.name}</Text>
+          </Box>
+        )}
         {editChip}
+        {bgChip}
         {cost}
         {effortChip}
+        {phaseChip}
         {waiting}
       </Box>
     )

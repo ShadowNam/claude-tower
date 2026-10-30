@@ -7,7 +7,15 @@ import { bumpTick, readAgents, readBuilds, readUsage, writeUsage } from './state
 
 import type { CacheFacts, Compaction, Sample, Usage, UsageWindow } from '../../types'
 
-/** How long a prompt cache stays warm on this plan. */
+/**
+ * How long a prompt cache stays warm, until the engine says otherwise.
+ *
+ * An hour is the assumption, not a fact: a session can be on a five-minute
+ * cache, and there a band promising "WARM 58m left" is not slightly wrong, it
+ * is the opposite of the truth. `classic.PreModelSwitch` carries the real
+ * figure, so the assumption only stands until the first model switch — which
+ * is why the drawing marks an unlearned one rather than stating it flatly.
+ */
 export const TTL_MS = 60 * 60_000
 export const TTL_MIN = 60
 
@@ -38,18 +46,22 @@ export type CacheView = {
   mode: 'warm' | 'cold'
   idleMs: number
   idleMin: number
+  /** Minutes before it goes cold, against the real lifetime. */
+  leftMin: number
   tokens: number
   model: string | null
 }
 
 /** Pure, so warm-to-cold can be tested at the boundary without a clock. */
-export function cacheView(cache: CacheFacts | null, now: number): CacheView | null {
+export function cacheView(cache: CacheFacts | null, now: number, ttlMs = TTL_MS): CacheView | null {
   if (cache === null || cache.lastAt <= 0 || cache.tokens <= 0) return null
   const idleMs = Math.max(0, now - cache.lastAt)
+  const ttl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : TTL_MS
   return {
-    mode: idleMs >= TTL_MS ? 'cold' : 'warm',
+    mode: idleMs >= ttl ? 'cold' : 'warm',
     idleMs,
     idleMin: Math.floor(idleMs / 60_000),
+    leftMin: Math.max(0, Math.ceil((ttl - idleMs) / 60_000)),
     tokens: cache.tokens,
     model: cache.model,
   }
@@ -85,7 +97,7 @@ export function compactionOf(prev: Compaction | null, e: MeasureFacts): Compacti
   const used = typeof b.totalTokens === 'number' && b.totalTokens >= 0 ? b.totalTokens : 0
   const firesAt =
     typeof b.autoCompactThreshold === 'number' && b.autoCompactThreshold > 0 ? b.autoCompactThreshold : null
-  return { max, used, firesAt, isEnabled: b.isAutoCompactEnabled === true }
+  return { max, used, firesAt, isEnabled: b.isAutoCompactEnabled === true, breakdown: b }
 }
 
 /**
@@ -176,7 +188,7 @@ export async function startUsage($: EngineInterface): Promise<void> {
  */
 export async function isMoving($: EngineInterface, now: number): Promise<boolean> {
   const u = await readUsage($)
-  if (u.cache !== null && u.cache.lastAt > 0 && now - u.cache.lastAt < TTL_MS) return true
+  if (u.cache !== null && u.cache.lastAt > 0 && now - u.cache.lastAt < (u.cacheTtlMs ?? TTL_MS)) return true
   for (const w of u.windows) {
     if (w.emptyAt !== null && w.emptyAt - now < SOON_MS) return true
     if (w.resetsAt === undefined) continue

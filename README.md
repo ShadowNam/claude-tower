@@ -47,6 +47,13 @@ a change made in your editor and will not un-count a file you reverted. That is
 what the name `edits` is doing, and why it is not called anything suggesting a
 working tree.
 
+The rate-limit windows belong to your account, not to this session, so they are
+re-read on a timer rather than only when this session gets a reply — a session
+left open while the work happened elsewhere used to show an hour-old percentage
+as though it were current. When more than one of your sessions is alive, the
+band says how many, which is the answer to "why did that drop while I was
+reading".
+
 **Usage** — how much of your 5-hour and 7-day windows is left, when each resets, whether the
 prompt cache is warm and what re-sending the context will cost once it is not, and what the
 engine says the session has cost. When a window is being spent fast enough to run out

@@ -4,6 +4,7 @@ import { project, projectWithin, trim } from '../hooks/core/burn'
 import { backgroundOf, heaviestOf, phaseOf, ttlOf } from '../hooks/core/engine'
 import { advanceOf, isPlanTool, planOf } from '../hooks/core/plan'
 import { fold as foldRate, median, rateOf } from '../hooks/core/rate'
+import { deadKeys, liveCount } from '../hooks/core/sessions'
 import { priceOf, rewarmCost } from '../hooks/core/prices'
 import { cacheView, compactionOf, fold, headroom } from '../hooks/core/usage'
 
@@ -332,4 +333,37 @@ test('background work is a snapshot, and says only what it saw', async () => {
   // Nothing in flight is not an empty list to draw; it is no chip at all.
   expect(backgroundOf([], [], 0).count).toBe(0)
   expect(backgroundOf(undefined, undefined, 0).scheduled).toBe(0)
+})
+
+test('a session counts itself even before its own heartbeat lands', async () => {
+  const NOW = 1_800_000_000_000
+  const mine = 'seen:me'
+  const fresh = (k: string, agoMs: number) => ({ key: k, at: NOW - agoMs })
+
+  // Three alive, this one among them.
+  expect(liveCount([fresh(mine, 1000), fresh('seen:a', 2000), fresh('seen:b', 5000)], NOW, mine)).toBe(3)
+
+  // A write can be lost — the store is last-one-wins — so a session that
+  // cannot see its own heartbeat still knows it is here.
+  expect(liveCount([fresh('seen:a', 2000)], NOW, mine)).toBe(2)
+  expect(liveCount([], NOW, mine)).toBe(1)
+
+  // A session that has gone stops counting.
+  expect(liveCount([fresh(mine, 1000), fresh('seen:gone', 10 * 60_000)], NOW, mine)).toBe(1)
+})
+
+test('only long-dead heartbeats are swept, and never this session’s own', async () => {
+  const NOW = 1_800_000_000_000
+  const DAY = 24 * 60 * 60_000
+  const mine = 'seen:me'
+  const entries = [
+    { key: mine, at: NOW - DAY },
+    { key: 'seen:old', at: NOW - DAY },
+    { key: 'seen:recent', at: NOW - 60_000 },
+  ]
+
+  // A delete is the one write here that cannot heal itself if it races, so it
+  // is kept to what is unambiguously gone, and never to this session.
+  expect(deadKeys(entries, NOW, mine)).toEqual(['seen:old'])
+  expect(deadKeys(entries, NOW, mine)).not.toContain(mine)
 })

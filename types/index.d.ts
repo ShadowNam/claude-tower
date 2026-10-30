@@ -183,6 +183,8 @@ export type Shape = {
   background?: Background | null
   /** Null outside a repository, or before the first read. */
   repo?: Repo | null
+  /** How many of your sessions are alive, this one included. */
+  sessions?: number
   /** The effort the turn ran at, after any silent downgrade. */
   effort: string
   /** Set while a compaction is running, or expected. */

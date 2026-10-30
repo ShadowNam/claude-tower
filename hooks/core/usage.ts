@@ -3,6 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import { projectWithin, trim } from './burn'
 import { until } from './fmt'
 import type { Feature } from './kinds'
+import { beat } from './sessions'
 import { bumpTick, readAgents, readBuilds, readUsage, writeUsage } from './state'
 
 import type { CacheFacts, Compaction, Sample, Usage, UsageWindow } from '../../types'
@@ -164,6 +165,8 @@ export async function startUsage($: EngineInterface): Promise<void> {
   $.clock.every(TICK_MS, () => {
     void (async () => {
       const at = await $.clock.now()
+      await refresh($, at)
+      await beat($, at)
       if (await isMoving($, at)) {
         skipped = 0
         await bumpTick($)
@@ -176,6 +179,30 @@ export async function startUsage($: EngineInterface): Promise<void> {
       }
     })()
   })
+}
+
+/**
+ * Re-reads the windows from the engine.
+ *
+ * Without this the figures only moved when **this** session got a response,
+ * and the rate-limit windows belong to the account rather than the session —
+ * so a session left open while the work happened elsewhere went on showing an
+ * hour-old percentage as though it were current. A wrong number stated plainly
+ * is worse than no number, and this one is the band's headline.
+ *
+ * No `breakdown` is asked for: without one the call computes nothing and is
+ * free, which is what makes polling it reasonable at all. The breakdown stays
+ * on the measurement, where something has actually changed.
+ */
+export async function refresh($: EngineInterface, now: number): Promise<void> {
+  try {
+    const u = await $.session.usage()
+    await writeUsage($, prev =>
+      fold(prev, { changed: ['rateLimits', 'context'], rateLimits: u.rateLimits, context: u.context }, now),
+    )
+  } catch {
+    // A reading that cannot be taken leaves the last one standing.
+  }
 }
 
 /**

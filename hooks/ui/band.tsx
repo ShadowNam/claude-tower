@@ -380,6 +380,14 @@ export const registerBand: Feature = (on, options) => {
         </Box>
       )
 
+    const sessionsChip =
+      shape?.sessions === undefined || shape.sessions < 2 ? null : (
+        <Box key="sessions" flexDirection="row" flexShrink={0}>
+          <Text color={TEXT} tabular>{shape.sessions}</Text>
+          <Text color={DIM}> sessions</Text>
+        </Box>
+      )
+
     const phaseChip =
       shape?.phase === undefined || !busy ? null : (
         <Box key="phase" flexShrink={0}>
@@ -432,6 +440,7 @@ export const registerBand: Feature = (on, options) => {
         {editChip}
         {bgChip}
         {cost}
+        {sessionsChip}
         {repoChip}
         {effortChip}
         {phaseChip}

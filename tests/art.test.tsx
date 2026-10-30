@@ -92,3 +92,70 @@ test('the drawn surfaces get meters, the terminal keeps its dots', async ($, on)
   expect((await term.find({ type: 'Text', text: /69% left/ }))?.text).toBe(' 69% left')
   await term.unmount()
 })
+
+/**
+ * An Svg with an empty alt is dropped by the surface and the row draws on
+ * without it — nothing fails, the drawing is simply absent. That is how the
+ * cache orb shipped missing in 2.0.0, so the alt is asserted on every drawing
+ * rather than assumed.
+ */
+const altOf = (d: unknown): unknown =>
+  (d as { alt?: unknown }).alt ?? (d as { props?: { alt?: unknown } }).props?.alt
+
+const says = (d: unknown): boolean => {
+  const alt = altOf(d)
+  return typeof alt === 'string' && alt.trim() !== ''
+}
+
+test('every drawing on the band says what it is', async ($, on) => {
+  SEED(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const drawings = await ui.findAll({ type: 'Svg' })
+
+  // The mark, and a capsule for each window.
+  expect(drawings.length).toBe(3)
+  expect(drawings.every(says)).toBe(true)
+  await ui.unmount()
+})
+
+test('every drawing in the agents panel says what it is', async ($, on) => {
+  SEED(on)
+  on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-opus-5-5' }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.agent.spawn({
+    subagentType: 'Explore',
+    description: 'map the repo',
+    prompt: 'go',
+    tool_use_id: 't1',
+    parentModel: 'claude-opus-5-5',
+    background: false,
+    fork: false,
+  })
+
+  const ui = await $.ui.mount({
+    plugin: 'tower',
+    component: 'Pane',
+    requestId: 'tower-agents',
+    surface: 'desktop',
+    props: {
+      title: 'Agents',
+      isFocused: false,
+      bodyColumns: 60,
+      placement: 'dock',
+      scroll: { offset: 0, bodyRows: 20 },
+      view: {},
+    },
+  })
+
+  const drawings = await ui.findAll({ type: 'Svg' })
+  // A running agent gets a status orb; this is the orb path the band could
+  // not reach from a test, since turn.step cannot be driven from one.
+  expect(drawings.length > 0).toBe(true)
+  expect(drawings.every(says)).toBe(true)
+  expect(drawings.some(d => altOf(d) === 'running')).toBe(true)
+  await ui.unmount()
+})

@@ -193,7 +193,7 @@ export const registerBand: Feature = (on, options) => {
     const crew =
       busy && agents !== null ? (
         <Box key="crew" flexDirection="row" flexShrink={0} marginRight={3} alignItems="center">
-          {Svg === null ? null : <Svg source={orb(OK)} alt="" {...ORB_SIZE} />}
+          {Svg === null ? null : <Svg source={orb(OK)} alt="warm" {...ORB_SIZE} />}
           <Text color={OK} bold> {agents.running} running</Text>
           {agents.failed > 0 ? <Text color={BAD} bold> · {agents.failed} failed</Text> : null}
           <Text color={DIM}> · {agents.costUsd === null ? '$?' : usd(agents.costUsd)}</Text>
@@ -211,7 +211,7 @@ export const registerBand: Feature = (on, options) => {
               <Text backgroundColor={OK} color={INK} bold>{' WARM '}</Text>
             ) : (
               <Box flexDirection="row" alignItems="center">
-                <Svg source={orb(OK)} alt="" {...ORB_SIZE} />
+                <Svg source={orb(OK)} alt="warm" {...ORB_SIZE} />
                 <Text color={OK} bold> WARM</Text>
               </Box>
             )}
@@ -226,7 +226,7 @@ export const registerBand: Feature = (on, options) => {
               <Text backgroundColor={WARN} color={INK} bold>{' COLD '}</Text>
             ) : (
               <Box flexDirection="row" alignItems="center">
-                <Svg source={orb(WARN)} alt="" {...ORB_SIZE} />
+                <Svg source={orb(WARN)} alt="cold" {...ORB_SIZE} />
                 <Text color={WARN} bold> COLD</Text>
               </Box>
             )}

@@ -1,0 +1,12 @@
+{
+  "name": "tower",
+  "owner": { "name": "Shadow" },
+  "description": "Tower: usage, agents, builds and Tank, seen from inside the session.",
+  "plugins": [
+    {
+      "name": "tower",
+      "source": "./",
+      "description": "One place to see what a Claude session is costing, what its agents are doing, how far the build is, and whether Tank is healthy."
+    }
+  ]
+}

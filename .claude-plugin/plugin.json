@@ -1,0 +1,81 @@
+{
+  "name": "tower",
+  "version": "1.0.0",
+  "description": "One place to see what a Claude session is costing, what its agents are doing, how far the build is, and whether Tank is healthy.",
+  "author": { "name": "Shadow" },
+  "license": "MIT",
+  "keywords": ["usage", "cost", "agents", "build", "tank", "status", "mod", "claude-code"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "usageBand": {
+      "type": "boolean",
+      "title": "Usage band",
+      "description": "Show usage windows, prompt-cache state and session cost above the prompt.",
+      "default": true
+    },
+    "agentsPanel": {
+      "type": "boolean",
+      "title": "Agents panel",
+      "description": "Track subagents: what they are doing, what they cost and how far along they are.",
+      "default": true
+    },
+    "buildBar": {
+      "type": "boolean",
+      "title": "Build status bar",
+      "description": "Show build progress with an estimated finish for local, CI and Tank builds.",
+      "default": true
+    },
+    "tankPanel": {
+      "type": "boolean",
+      "title": "Tank panel",
+      "description": "Show activity, queue depth and health across your Tank instances.",
+      "default": false
+    },
+    "tankServers": {
+      "type": "string",
+      "title": "Tank instances",
+      "description": "The MCP server names of the Tank boxes to watch, one per entry, as /mcp lists them. Tower dials them with the engine's own connection, so it never needs their tokens.",
+      "multiple": true,
+      "default": ["tank"]
+    },
+    "githubToken": {
+      "type": "string",
+      "title": "GitHub token",
+      "description": "A token with Actions read access, so the build bar can follow CI runs for this repository. Stored in your operating system's keychain, never in a settings file. Leave empty to not watch CI at all.",
+      "sensitive": true,
+      "default": ""
+    },
+    "notifyEnabled": {
+      "type": "boolean",
+      "title": "Send WhatsApp notifications",
+      "description": "The master switch. While this is off nothing is ever sent, whatever else is set. Messages go only to your own number, only from fixed templates.",
+      "default": false
+    },
+    "whatsappServer": {
+      "type": "string",
+      "title": "WhatsApp MCP server",
+      "description": "The name of your WhatsApp gateway as /mcp lists it. Tower dials it with the engine's own connection, so it never holds your gateway key.",
+      "default": ""
+    },
+    "notifyLevel": {
+      "type": "string",
+      "title": "Notification level",
+      "description": "Milestones sends what needs you: failures, stopped agents, a spent rate limit, and anything on Tank waiting for an answer. Verbose adds successes and warnings. Silent sends nothing.",
+      "options": ["silent", "milestones", "verbose", "debug"],
+      "default": "silent"
+    },
+    "quietHours": {
+      "type": "string",
+      "title": "Quiet hours",
+      "description": "Local time range during which messages are held and delivered as one morning digest. Empty disables quiet hours.",
+      "default": "22:00-07:00"
+    },
+    "tankWatchdog": {
+      "type": "string",
+      "title": "Tank watchdog",
+      "description": "alert surfaces stalled or failed jobs and waits for you. resume also retries transient failures automatically, capped and logged.",
+      "options": ["off", "alert", "resume"],
+      "default": "alert"
+    }
+  }
+}

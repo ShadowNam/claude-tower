@@ -54,5 +54,12 @@
       "resume"
     ],
     "default": "alert"
+  },
+  "githubToken": {
+    "type": "string",
+    "title": "GitHub token",
+    "description": "A token with Actions read access, for live CI run progress.",
+    "sensitive": true,
+    "default": ""
   }
 }

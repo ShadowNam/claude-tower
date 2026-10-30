@@ -1,22 +1,28 @@
 # Salvage
 
 Four features lifted out of Tower whole, for a plugin of their own later.
-All of this is also written up as one self-contained document in
-[`../EXTRACTED.md`](../EXTRACTED.md), which is the file to hand to a fresh
-session.
+All of it is also written up as one self-contained document in
+[`../EXTRACTED.md`](../EXTRACTED.md) — that is the file to hand to a fresh
+session, since it assumes no access to this repository.
+
 Nothing here is loaded: `hooks/hooks.json` names one module and it does not
 reach this folder. The tests are `.spec.ts` rather than `.test.ts` so
 `claude plugin test` leaves them alone — rename them back when they have a
 plugin to run against.
 
-They were removed because none of them is about watching the session you are
-sitting in. `ci.ts` is the odd one: it needs no MCP server, only a GitHub token,
-but it watches a build on someone else's machine and the token was never set, so
-it has never run. They watch a machine somewhere else, and they all go through
-`$.mcp.call`, which has a consequence worth knowing before reviving them:
-**auto mode refuses every one of these calls.** The classifier judges a call
-against the model request that asked for it, and a mod's call belongs to no
-request, so it fails closed. In auto mode all three features are dead.
+They were removed because none of them watches the session you are sitting in.
+Three of them — notify, tank and the watchdog — watch a machine somewhere else,
+and all three go through `$.mcp.call`, which has a consequence worth knowing
+before reviving them: **auto mode refuses every one of those calls.** The
+classifier judges a call against the model request that asked for it, and a
+mod's call belongs to no request, so it fails closed. In auto mode all three
+are dead, and no setting changes that.
+
+`ci.ts` is the odd one out. It needs no MCP server, only a GitHub token, so
+auto mode does not touch it — but it watches a build on someone else's machine,
+and the token was never set in the session it came from, so **not one line of
+it has ever run against a real response.** Treat it as a solid starting point,
+not as working code.
 
 ## What is here
 
@@ -29,7 +35,7 @@ request, so it fails closed. In auto mode all three features are dead.
 | `hooks/ci.ts` | GitHub Actions run polling, for a build bar | 176 |
 | `tests/*.spec.ts` | 23 tests, all of the policy ones pure | — |
 | `types.d.ts` | `Tank`, `TankInstance`, `TankTask`, `TankQueue`, `TankAlert` | 53 |
-| `userConfig.json` | The seven settings these owned | — |
+| `userConfig.json` | The eight settings these owned | — |
 
 ## Putting them back
 

@@ -106,24 +106,32 @@ export async function pollMarker($: EngineInterface, cwd: string, now: number): 
 }
 
 /** What `/tower-hook` prints: the smallest emitter that satisfies the reader. */
-export const SNIPPET = `// Write this beside your build. Rename, never write in place:
-// a half-written file read by the watcher is this pattern's one real failure.
+export const SNIPPET = `// Rename, never write in place: a half-written file read by the watcher is
+// this pattern's one real failure, and a rename is atomic.
 const fs = require('fs')
 const F = '.buildstatus.json'
+
+// Read package.json where there is one; a build is not always a Node project.
+let pkg = {}
+try { pkg = require('./package.json') } catch {}
+
 const base = {
   schema: 1,
-  id: process.pid + '',
-  project: require('./package.json').name,
-  version: require('./package.json').version,
+  id: String(process.pid),
+  project: pkg.name || require('path').basename(process.cwd()),
+  version: pkg.version,
   target: process.argv.slice(2).join(' ') || 'build',
   startedAt: new Date().toISOString(),
   heartbeatSec: 5,
 }
+
 function status(o) {
   const body = JSON.stringify({ ...base, ...o, updatedAt: new Date().toISOString() })
   fs.writeFileSync(F + '.tmp', body)
   fs.renameSync(F + '.tmp', F)
 }
+
 // status({ state: 'running', progress: 0.4, step: { name: 'bundling' } })
-// status({ state: 'succeeded' })  /  status({ state: 'failed', error: 'first error line' })
+// status({ state: 'succeeded' })
+// status({ state: 'failed', error: 'first error line' })
 module.exports = { status }`

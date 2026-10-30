@@ -5,7 +5,7 @@ import type { Feature, Options } from './kinds'
 import { readDiag, writeDiag } from './state'
 
 /** Must match the version in .claude-plugin/plugin.json. */
-const VERSION = '2.7.0'
+const VERSION = '2.7.1'
 
 /**
  * Seeds what `/tower` reports. Called from the mod's one session.start hook:
@@ -62,13 +62,25 @@ export const registerDiag: Feature = (on, options) => {
     const d = await readDiag($)
     if (!d) return { text: 'Tower is loaded, but this session has not started it yet.' }
     const now = await $.clock.now()
+
+    // Asked now, not remembered from load. A surface attaches after
+    // session.start, so the value stamped at load says 'none' for the whole
+    // session while the band is plainly drawing on one — which made the one
+    // line of this report that should settle an argument the one that lied.
+    let surfaces = d.surface
+    try {
+      const live = await $.session.surfaces()
+      if (live.length > 0) surfaces = live.join(', ')
+    } catch {
+      // Keep what load saw rather than claim nothing.
+    }
     const failures = d.failures ?? []
     return {
       text: [
         `Tower v${d.version}`,
         '',
         `  engine     ${d.engine}`,
-        `  surface    ${d.surface}`,
+        `  surface    ${surfaces}`,
         `  loaded     ${since(now - d.loadedAt)} ago (load ${d.reloads} this session)`,
         `  panels     ${d.panels.length > 0 ? d.panels.join(', ') : 'none switched on'}`,
         ...(failures.length > 0

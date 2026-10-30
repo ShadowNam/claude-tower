@@ -93,7 +93,21 @@ first error line and holds the row until something else needs it.
 
 ## Settings
 
-Everything is in `/config`, under Tower.
+How you change these depends on where you are running.
+
+**In the desktop app**, use the **+** beside the prompt box → **Plugins** →
+Tower. `/config` and `/plugin` open interactive terminal panels, which the
+desktop app has no way to show, so neither one works there.
+
+**From a terminal**, either `/plugin configure tower@tower` at the prompt, or
+from a shell without starting a session:
+
+```
+echo '{"bandLayout":"hero"}' | claude plugin configure tower@tower --values-stdin
+```
+
+`claude plugin configure tower@tower` with no values lists every option and
+says which are set.
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -102,10 +116,10 @@ Everything is in `/config`, under Tower.
 | Agents panel | on | |
 | Build status bar | on | |
 
-Changing any of these in `/config` reloads the mod with the new values. Nothing has to
-be restarted. Changing them with `claude plugin configure` from a shell writes the same
-file from another process, which the running session does not re-read — that one needs
-the app restarted.
+A change made inside the session reloads the mod with the new values and nothing
+restarts. A change written from a shell goes into the same file from another
+process, which the running session does not re-read, so that one needs the app
+restarted.
 
 
 ## Commands

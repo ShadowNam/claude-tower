@@ -50,7 +50,7 @@ says whether a fan-out really ran in parallel.
 
 **Builds** — one row for the build that matters most, with a progress bar and an expected
 finish. Sources, in the order they are trusted: a `.buildstatus.json` marker a build script
-writes, a GitHub Actions run, and a shell command run in this session. A failure shows its
+writes and a shell command run in this session. A failure shows its
 first error line and holds the row until something else needs it.
 
 ## Settings
@@ -62,7 +62,6 @@ Everything is in `/config`, under Tower.
 | Usage band | on | |
 | Agents panel | on | |
 | Build status bar | on | |
-| GitHub token | empty | Actions read access, for CI progress. Kept in your OS keychain |
 
 Changing any of these in `/config` reloads the mod with the new values. Nothing has to
 be restarted. Changing them with `claude plugin configure` from a shell writes the same
@@ -132,7 +131,12 @@ from it. Both are MIT; see NOTICE.
 ## What was taken out
 
 Tower watches the session you are sitting in. Three features did not — Tank
-polling, the Tank watchdog and WhatsApp notifications all watched a machine
-somewhere else — so they were lifted out whole into [`salvage/`](salvage/),
-with their tests, types, settings and the reasoning behind their safety
+polling, the Tank watchdog, WhatsApp notifications and GitHub Actions polling
+all watched a machine somewhere else — so they were lifted out whole into [`salvage/`](salvage/),
+along with the GitHub Actions polling, with their tests, types, settings and the reasoning behind their safety
 rules. Nothing there is loaded. Its README says how to revive them.
+
+Everything taken out is also written up whole in [`EXTRACTED.md`](EXTRACTED.md):
+the code, its types, its settings, how it was wired and the reasoning behind the
+parts that look arbitrary — enough to rebuild any of it somewhere else without
+reading this repository.

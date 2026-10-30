@@ -1,54 +1,12 @@
 import { expect, test } from 'claude-code/testing'
 
 import { sweepStale } from '../hooks/core/builds'
-import { failingStepOf, progressOf, repoOf, stateOf } from '../hooks/core/ci'
 import { buildOf } from '../hooks/core/marker'
 
 import type { Build } from '../types'
 
 const T0 = 1_800_000_000_000
 const MIN = 60_000
-
-test('a GitHub remote is recognised in either spelling', async () => {
-  expect(repoOf('https://github.com/acme/web-app.git')).toBe('acme/web-app')
-  expect(repoOf('git@github.com:acme/web-app.git')).toBe('acme/web-app')
-  expect(repoOf('https://github.com/acme/web-app')).toBe('acme/web-app')
-  expect(repoOf('https://gitlab.com/x/y.git')).toBe(null)
-  expect(repoOf(null)).toBe(null)
-})
-
-test("CI's words for where a run is become ours", async () => {
-  expect(stateOf('in_progress', null)).toBe('running')
-  expect(stateOf('queued', null)).toBe('running')
-  expect(stateOf('completed', 'success')).toBe('succeeded')
-  expect(stateOf('completed', 'failure')).toBe('failed')
-  expect(stateOf('completed', 'timed_out')).toBe('failed')
-  expect(stateOf('completed', 'cancelled')).toBe('cancelled')
-})
-
-test('a skipped step is not progress', async () => {
-  const steps = [
-    { name: 'checkout', status: 'completed', conclusion: 'success' },
-    { name: 'install', status: 'completed', conclusion: 'success' },
-    { name: 'windows only', status: 'completed', conclusion: 'skipped' },
-    { name: 'test', status: 'in_progress', conclusion: null },
-  ]
-  const where = progressOf(steps)
-  // Three steps really ran: two done, one half-counted while it runs.
-  expect(where?.progress).toBe(2.5 / 3)
-  expect(where?.step).toBe('test')
-
-  expect(progressOf([])).toBe(null)
-})
-
-test('only the first failing step is named', async () => {
-  const steps = [
-    { name: 'build', status: 'completed', conclusion: 'failure' },
-    { name: 'test', status: 'completed', conclusion: 'failure' },
-  ]
-  expect(failingStepOf(steps)).toBe('build')
-  expect(failingStepOf([{ name: 'build', status: 'completed', conclusion: 'success' }])).toBe(null)
-})
 
 test('a marker file is only trusted while its writer keeps breathing', async () => {
   const marker = {

@@ -1,13 +1,18 @@
 # Salvage
 
-Three features lifted out of Tower whole, for a plugin of their own later.
+Four features lifted out of Tower whole, for a plugin of their own later.
+All of this is also written up as one self-contained document in
+[`../EXTRACTED.md`](../EXTRACTED.md), which is the file to hand to a fresh
+session.
 Nothing here is loaded: `hooks/hooks.json` names one module and it does not
 reach this folder. The tests are `.spec.ts` rather than `.test.ts` so
 `claude plugin test` leaves them alone — rename them back when they have a
 plugin to run against.
 
 They were removed because none of them is about watching the session you are
-sitting in. They watch a machine somewhere else, and they all go through
+sitting in. `ci.ts` is the odd one: it needs no MCP server, only a GitHub token,
+but it watches a build on someone else's machine and the token was never set, so
+it has never run. They watch a machine somewhere else, and they all go through
 `$.mcp.call`, which has a consequence worth knowing before reviving them:
 **auto mode refuses every one of these calls.** The classifier judges a call
 against the model request that asked for it, and a mod's call belongs to no
@@ -21,6 +26,7 @@ request, so it fails closed. In auto mode all three features are dead.
 | `hooks/tank.ts` | Tank instance polling and the alert model | 273 |
 | `hooks/watchdog.ts` | Resuming Tank tasks killed by a transient failure | 186 |
 | `hooks/pane-tank.tsx` | The Tank panel | 138 |
+| `hooks/ci.ts` | GitHub Actions run polling, for a build bar | 176 |
 | `tests/*.spec.ts` | 23 tests, all of the policy ones pure | — |
 | `types.d.ts` | `Tank`, `TankInstance`, `TankTask`, `TankQueue`, `TankAlert` | 53 |
 | `userConfig.json` | The seven settings these owned | — |

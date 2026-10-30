@@ -48,3 +48,13 @@ export const YELLOW = '#edd05c'
  */
 export const BG = '#211e1a'
 export const INK = '#17150f'
+
+/**
+ * A tile set apart from the bar it sits on.
+ *
+ * The hero tile used BG, which is the bar's own colour — so it had a
+ * background that was exactly the background, and the layout that exists to
+ * give one window more weight gave it no visible weight at all. A panel has
+ * to differ from what is behind it or it is not a panel.
+ */
+export const PANEL = '#2c2822'

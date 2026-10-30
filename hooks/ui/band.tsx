@@ -7,8 +7,8 @@ import { rewarmCost } from '../core/prices'
 import { heaviestOf } from '../core/engine'
 import { FAULT_MS, faultWord } from '../core/shape'
 import { readAgents, readBuilds, readEdits, readPlan, readShape, readTick, readUsage } from '../core/state'
-import { cacheView, headroom, heroOf, layoutOf, TTL_MIN } from '../core/usage'
-import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
+import { cacheView, headroom, heroOf, layoutOf, nextLayout, TTL_MIN } from '../core/usage'
+import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, PANEL, TEXT, WARN, YELLOW } from './theme'
 
 import type { UsageWindow } from '../../types'
 
@@ -162,7 +162,7 @@ export const registerBand: Feature = (on, options) => {
             <Svg source={mark(ORANGE)} alt="Tower" {...MARK_SIZE} />
           </Box>
         )}
-        <Text color={TEXT} weight="bold">USAGE</Text>
+        <Button key="cycle" label="USAGE" plain dimColor hotkey="2" onPress={() => { void $.config.set({ key: 'bandLayout', value: nextLayout(layout) }) }} />
       </Box>
     )
 
@@ -240,7 +240,7 @@ export const registerBand: Feature = (on, options) => {
           flexDirection="column"
           flexShrink={0}
           hover={{ scope: key }}
-          {...(boxed ? { paddingX: 1, backgroundColor: BG } : {})}
+          {...(boxed ? { paddingX: 1, backgroundColor: PANEL } : {})}
         >
           <Text size="caption" color={DIM}>{p.name}</Text>
           <Text weight="bold" color={p.color} tabular>{p.left}% left</Text>
@@ -281,7 +281,7 @@ export const registerBand: Feature = (on, options) => {
     const asHero = (key: string, w: UsageWindow) => {
       const p = partOf(w, now, CELLS)
       return (
-        <Box key={key} flexDirection="column" flexShrink={0} paddingX={1} backgroundColor={BG} hover={{ scope: key }}>
+        <Box key={key} flexDirection="column" flexShrink={0} paddingX={1} backgroundColor={PANEL} hover={{ scope: key }}>
           <Text size="caption" color={DIM}>
             {p.name === '7D' ? '7-DAY WINDOW' : p.name === '5H' ? '5-HOUR WINDOW' : p.name}
           </Text>

@@ -180,8 +180,24 @@ export function heroOf(windows: readonly UsageWindow[], now: number): UsageWindo
 /** The layouts the band knows, and what an unknown setting falls back to. */
 export type Layout = 'rows' | 'dials' | 'hero' | 'cards'
 
+export const LAYOUTS: readonly Layout[] = ['dials', 'hero', 'cards', 'rows']
+
 export function layoutOf(raw: unknown): Layout {
-  return raw === 'rows' || raw === 'dials' || raw === 'hero' || raw === 'cards' ? raw : 'dials'
+  return LAYOUTS.includes(raw as Layout) ? (raw as Layout) : 'dials'
+}
+
+/**
+ * The next layout round the loop.
+ *
+ * Four layouts behind a settings menu is four layouts nobody will ever
+ * compare: by the time you have found the menu, changed the value and come
+ * back, the thing you were comparing it against is gone from memory. A press
+ * on the band itself puts them side by side in time, which is the only way a
+ * layout choice can actually be made.
+ */
+export function nextLayout(current: Layout): Layout {
+  const at = LAYOUTS.indexOf(current)
+  return LAYOUTS[(at + 1) % LAYOUTS.length] as Layout
 }
 
 /**

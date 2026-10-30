@@ -70,6 +70,13 @@ The same figures, arranged four ways. Change it in `/config`; nothing restarts.
 - **`cards`** — every figure on its own tile, all equal. Scans well, takes the
   most room.
 
+**Press the band's own `USAGE` label to cycle them** — or `2` from an empty
+prompt box. It writes the setting, so the change sticks rather than lasting
+until the next reload, and the label says which layout is on. Four layouts
+behind a settings menu is four layouts nobody will ever compare: by the time
+you have found the menu and come back, the thing you were comparing against is
+gone from memory.
+
 **The terminal always draws `rows`**, whatever the setting says. It can draw
 neither a gauge nor a tile, and an arc made of text is a worse bar rather than
 a dial.

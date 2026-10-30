@@ -1,5 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
+import { layoutOf, nextLayout } from '../hooks/core/usage'
+
 const BAND = {
   plugin: 'tower',
   component: 'AbovePrompt',
@@ -39,7 +41,7 @@ test('the band draws each window with what is left of it', { options: { bandLayo
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
 
-    expect((await ui.find({ type: 'Text', text: /USAGE/ }))?.text).toBe('USAGE')
+    expect((await ui.find({ type: 'Button', label: 'USAGE' })) !== undefined).toBe(true)
     // 31% used of the seven-day window leaves 69.
     expect((await ui.find({ type: 'Text', text: /69% left/ }))?.text).toBe(' 69% left')
     expect((await ui.find({ type: 'Text', text: /85% left/ }))?.text).toBe(' 85% left')
@@ -116,4 +118,52 @@ test('a switched-off band draws nothing at all', { options: { usageBand: false }
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /USAGE/ })).toBe(undefined)
   await ui.unmount()
+})
+
+test('the band names the layout it is drawing, and cycles on a press', async ($, on) => {
+  const set: { key: string; value: unknown }[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.version', () => ({ value: { version: '2.1.309', base: 'test', builtAt: '' } }))
+  on('session.model', () => ({ value: 'claude-opus-5' }))
+  on('session.usage', () => ({ value: { rateLimits: WINDOWS, context: { tokens: 1, window: 200_000 } } }))
+  on('command.register', () => ({ value: { command: 'tower' } }))
+  on('clock.now', () => ({ value: NOW }))
+  on('clock.every', () => ({ value: {} }))
+  on('config.set', (_, e) => {
+    const row = e as { key: string; value: unknown }
+    set.push(row)
+    return { value: String(row.value) }
+  })
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>beneath</Text>
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+
+  // The control is the band's own label, so it costs no columns of its own.
+  const cycle = await ui.find({ type: 'Button', label: 'USAGE' })
+  expect(cycle !== undefined).toBe(true)
+
+  // Pressing it writes the setting, which is what makes the change stick
+  // rather than lasting until the next reload.
+  await ui.press({ key: 'cycle' })
+  expect(set.length).toBe(1)
+  expect(set[0]?.key).toBe('bandLayout')
+  expect(set[0]?.value).toBe('hero')
+  await ui.unmount()
+})
+
+test('cycling visits every layout and comes back', async () => {
+  // Four presses from any starting point return you to where you began, so
+  // the control can never strand you somewhere you cannot get out of.
+  let at: ReturnType<typeof layoutOf> = 'dials'
+  const seen = [at]
+  for (let i = 0; i < 4; i++) {
+    at = nextLayout(at)
+    seen.push(at)
+  }
+  expect(seen).toEqual(['dials', 'hero', 'cards', 'rows', 'dials'])
+  expect(new Set(seen).size).toBe(4)
 })

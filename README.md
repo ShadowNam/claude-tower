@@ -31,6 +31,11 @@ No GitHub sign-in is needed to install it.
 
 ## What it shows
 
+Where the surface draws vector art — the desktop app, the editor, the phone — each
+window is a drawn meter and the band carries the mod's mark, so it is obvious at a
+glance whose row it is. The terminal gets dot strings saying the same thing, and every
+figure is written out either way: a drawing is never the only account of a number.
+
 **Usage** — how much of your 5-hour and 7-day windows is left, when each resets, whether the
 prompt cache is warm and what re-sending the context will cost once it is not, and what the
 engine says the session has cost. When a window is being spent fast enough to run out

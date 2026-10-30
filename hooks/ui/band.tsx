@@ -1,6 +1,7 @@
 import { totalsOf } from '../core/agents'
 import { headlineOf, othersOf, viewOf } from '../core/builds'
 import { at, dots, since, tokens, until, usd } from '../core/fmt'
+import { MARK_SIZE, mark, METER_SIZE, meter } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
 import { readAgents, readBuilds, readTank, readTick, readUsage } from '../core/state'
@@ -127,14 +128,22 @@ export const registerBand: Feature = (on, options) => {
     const below =
       drawn && typeof drawn === 'object' && (drawn as { type?: string }).type !== 'engine' ? drawn : null
 
-    const { Box, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Text } = ui
+    // The terminal's table still lists Svg, so ask the surface, not the table.
+    const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 100
     const isWide = columns >= WIDE_AT
     const isStacked = !isWide && columns >= STACKED_AT
     const cells = isWide || isStacked ? CELLS : TIGHT_CELLS
 
     const label = (
-      <Box key="label" flexShrink={0} marginRight={2}>
+      <Box key="label" flexShrink={0} marginRight={2} flexDirection="row" alignItems="center">
+        {Svg === null ? null : (
+          <Box marginRight={1}>
+            <Svg source={mark(ORANGE)} alt="Tower" {...MARK_SIZE} />
+          </Box>
+        )}
         <Text color={TEXT} bold>USAGE</Text>
       </Box>
     )
@@ -144,8 +153,14 @@ export const registerBand: Feature = (on, options) => {
       return (
         <Box key={`w${i}`} flexDirection="row" flexShrink={0} marginRight={3}>
           <Text color={DIM} bold>{p.name} </Text>
-          <Text color={p.color}>{p.on}</Text>
-          <Text color={EMPTY}>{p.off}</Text>
+          {Svg === null ? (
+            <>
+              <Text color={p.color}>{p.on}</Text>
+              <Text color={EMPTY}>{p.off}</Text>
+            </>
+          ) : (
+            <Svg source={meter(p.left, p.color, EMPTY)} alt={`${p.left}% left`} {...METER_SIZE} />
+          )}
           <Text color={p.color} bold> {p.left}% left</Text>
           {p.isLow ? <Text backgroundColor={BAD} color={INK} bold>{' LOW '}</Text> : null}
           {p.reset === '' ? null : <Text color={DIM}> · {p.reset}</Text>}
@@ -158,10 +173,16 @@ export const registerBand: Feature = (on, options) => {
       const p = partOf(w, now, cells)
       return (
         <Box key={`w${i}`} flexDirection="column" flexShrink={0} marginRight={3}>
-          <Box flexDirection="row">
+          <Box flexDirection="row" alignItems="center">
             <Text color={DIM} bold>{p.name} </Text>
-            <Text color={p.color}>{p.on}</Text>
-            <Text color={EMPTY}>{p.off}</Text>
+            {Svg === null ? (
+              <>
+                <Text color={p.color}>{p.on}</Text>
+                <Text color={EMPTY}>{p.off}</Text>
+              </>
+            ) : (
+              <Svg source={meter(p.left, p.color, EMPTY)} alt={`${p.left}% left`} {...METER_SIZE} />
+            )}
           </Box>
           <Box flexDirection="row">
             <Text color={p.color} bold>{p.left}% left</Text>

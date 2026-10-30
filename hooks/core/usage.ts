@@ -150,6 +150,41 @@ export function fold(prev: Usage, e: MeasureFacts, now: number): Usage {
 }
 
 /**
+ * Which window gets the space, for the layouts that give one window more.
+ *
+ * One window is the one that will stop you, and which it is changes through
+ * the day: a 7-day window at 8% matters more than a 5-hour one at 60%, right
+ * up until the 5-hour one starts draining fast enough to empty before it
+ * resets.
+ *
+ * So a window on course to run out wins, soonest first — a deadline changes
+ * what you do next, where a level only says where you are. Otherwise the
+ * emptiest wins, and a tie goes to the window listed first, which is the
+ * slower one and the one you can do least about.
+ */
+export function heroOf(windows: readonly UsageWindow[], now: number): UsageWindow | null {
+  if (windows.length === 0) return null
+
+  const running = windows
+    .filter(w => w.emptyAt !== null && w.emptyAt > now)
+    .sort((a, b) => (a.emptyAt as number) - (b.emptyAt as number))
+  if (running.length > 0) return running[0] as UsageWindow
+
+  let worst = windows[0] as UsageWindow
+  for (const w of windows) {
+    if (w.percentUsed > worst.percentUsed) worst = w
+  }
+  return worst
+}
+
+/** The layouts the band knows, and what an unknown setting falls back to. */
+export type Layout = 'rows' | 'dials' | 'hero' | 'cards'
+
+export function layoutOf(raw: unknown): Layout {
+  return raw === 'rows' || raw === 'dials' || raw === 'hero' || raw === 'cards' ? raw : 'dials'
+}
+
+/**
  * First reading of the windows, and the ticker that keeps countdowns current.
  * Called from the mod's one session.start hook in boot.ts.
  */

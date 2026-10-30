@@ -1,4 +1,4 @@
-import { BG, EMPTY } from './theme'
+import { BG, DIM, EMPTY } from './theme'
 
 /**
  * The band's drawings, as SVG source.
@@ -87,6 +87,9 @@ function sweep(id: string, w: number): string {
     '</style>'
   )
 }
+
+/** The dial's shown size in CSS pixels. */
+const DIAL = 46
 
 /** Shown size in CSS pixels, and the 2× box the shapes are drawn in. */
 const METER_W = 84
@@ -400,3 +403,70 @@ export function mark(color: string): string {
 }
 
 export const MARK_SIZE = { width: MARK, height: MARK } as const
+
+/**
+ * An arc gauge, with its figure inside it.
+ *
+ * The honest trade against a bar: a 260° sweep at this radius gives roughly
+ * a third of the length per percent that an 84-wide bar does, so it is the
+ * less precise instrument. It is chosen for what it is better at — reading as
+ * a dial, at a glance, without a label to say which way is full.
+ *
+ * The number is drawn inside the arc rather than placed over it. That means a
+ * glyph in the markup, which the rest of this file avoids because the surface
+ * picks the font elsewhere and a mismatch shows. Here the alternative is
+ * positioning text absolutely over a drawing in a layout engine whose units
+ * are terminal cells, which lands badly far more often than a font differs.
+ * The stack asks for the system UI face, which is what the surface uses too.
+ */
+export function dial(leftPercent: number, color: string, label: string, title = ''): string {
+  const id = uid()
+  const base = parse(color)
+  const S = DIAL * SCALE
+  const c = S / 2
+  const r = c - 11
+  const left = clamp(leftPercent)
+
+  // 260° of sweep, opening at the bottom, so full reads as a closed ring.
+  const START = -220
+  const SWEEP = 260
+  const at = (p: number): string => {
+    const a = ((START + (p / 100) * SWEEP) * Math.PI) / 180
+    return `${(c + Math.cos(a) * r).toFixed(2)} ${(c + Math.sin(a) * r).toFixed(2)}`
+  }
+  const arc = (from: number, to: number): string =>
+    `M ${at(from)} A ${r} ${r} 0 ${((to - from) / 100) * SWEEP > 180 ? 1 : 0} 1 ${at(to)}`
+
+  return svg(
+    DIAL,
+    DIAL,
+    [
+      title === '' ? '' : `<title>${title.replace(/[<>&]/g, '')}</title>`,
+      '<defs>',
+      `<linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="1">`,
+      `<stop offset="0" stop-color="${hex(lift(base, 0.34))}"/>`,
+      `<stop offset="1" stop-color="${hex(drop(base, 0.24))}"/>`,
+      '</linearGradient>',
+      contact(`${id}x`, 1.6, 1.6),
+      '</defs>',
+      // The channel the bead sits in, seated on the bar like everything else.
+      `<path d="${arc(0, 100)}" fill="none" stroke="#000000" stroke-opacity="0.5" stroke-width="11" stroke-linecap="round" filter="url(#${id}x)"/>`,
+      `<path d="${arc(0, 100)}" fill="none" stroke="${hex(parse(BG))}" stroke-width="11" stroke-linecap="round"/>`,
+      `<path d="${arc(0, 100)}" fill="none" stroke="${hex(parse(EMPTY))}" stroke-width="2" stroke-linecap="round" stroke-opacity="0.9"/>`,
+      left <= 0
+        ? ''
+        : `<path d="${arc(0, left)}" fill="none" stroke="url(#${id}a)" stroke-width="9" stroke-linecap="round"/>`,
+      // A thread of the colour's own light along the lit edge of the arc.
+      left <= 2
+        ? ''
+        : `<path d="${arc(0.5, left - 0.5)}" fill="none" stroke="${hex(lift(base, 0.5))}" stroke-opacity="0.45" stroke-width="2" stroke-linecap="round"/>`,
+      `<text x="${c}" y="${c + 6}" text-anchor="middle" font-size="25" font-weight="700" fill="${hex(lift(base, 0.1))}"`,
+      ` font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"`,
+      ` style="font-variant-numeric:tabular-nums">${Math.round(left)}</text>`,
+      `<text x="${c}" y="${c + 22}" text-anchor="middle" font-size="13" font-weight="600" fill="${hex(parse(DIM))}"`,
+      ` font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif">${label.replace(/[<>&]/g, '')}</text>`,
+    ].join(''),
+  )
+}
+
+export const DIAL_SIZE = { width: DIAL, height: DIAL } as const

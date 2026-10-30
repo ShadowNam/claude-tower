@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { capsule, mark, orb } from '../hooks/ui/art'
+import { layoutOf } from '../hooks/core/usage'
 
 const BAND = {
   plugin: 'tower',
@@ -130,7 +131,7 @@ test('two drawings in one row never share a gradient id', async () => {
   expect(idOf(a)).not.toBe(idOf(b))
 })
 
-test('the drawn surfaces get meters, the terminal keeps its dots', async ($, on) => {
+test('the drawn surfaces get meters, the terminal keeps its dots', { options: { bandLayout: 'rows' } }, async ($, on) => {
   SEED(on)
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
 
@@ -267,4 +268,39 @@ test('a shape is seated by a shadow that degrades to nothing visible', async () 
   for (const [, dy] of svg.matchAll(/feOffset dy="([\d.]+)"/g)) {
     expect(Number(dy) <= 2).toBe(true)
   }
+})
+
+test('each layout draws what it promises, and the terminal always gets rows', async ($, on) => {
+  const mount = async (surface: 'terminal' | 'desktop') =>
+    $.ui.mount({ ...BAND, surface })
+
+  SEED(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+  // Dials is the default. The figure moves inside the drawing, so the band has
+  // one Svg per window plus the mark, and no "% left" text of its own.
+  const desktop = await mount('desktop')
+  expect((await desktop.findAll({ type: 'Svg' })).length).toBe(3)
+  expect(await desktop.find({ type: 'Text', text: /% left/ })).toBe(undefined)
+  // The dial still says what it is, for anyone who cannot see it.
+  expect((await desktop.findAll({ type: 'Svg' })).some(d => /7D 69% left/.test(String(altOf(d))))).toBe(true)
+  await desktop.unmount()
+
+  // The terminal can draw neither a dial nor a tile, so it keeps rows however
+  // the setting reads — an arc made of text is a worse bar, not a dial.
+  const term = await mount('terminal')
+  expect((await term.findAll({ type: 'Svg' })).length).toBe(0)
+  expect((await term.find({ type: 'Text', text: /69% left/ }))?.text).toBe(' 69% left')
+  await term.unmount()
+})
+
+test('an unknown layout falls back rather than drawing nothing', async () => {
+  expect(layoutOf('dials')).toBe('dials')
+  expect(layoutOf('hero')).toBe('hero')
+  expect(layoutOf('cards')).toBe('cards')
+  expect(layoutOf('rows')).toBe('rows')
+  // A setting from an older version, or a typo, must not blank the band.
+  expect(layoutOf('sparkline')).toBe('dials')
+  expect(layoutOf(undefined)).toBe('dials')
+  expect(layoutOf(7)).toBe('dials')
 })

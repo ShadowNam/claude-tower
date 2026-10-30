@@ -21,7 +21,7 @@ const WINDOWS = [
   { kind: 'five_hour', percentUsed: 15, resetsAt: new Date(NOW + 21 * 60_000).toISOString() },
 ]
 
-test('the band draws each window with what is left of it', async ($, on) => {
+test('the band draws each window with what is left of it', { options: { bandLayout: 'rows' } }, async ($, on) => {
   // Nothing sits beneath the mod: each hook here stands for the engine.
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.version', () => ({ value: { version: '2.1.309', base: 'test', builtAt: '' } }))
@@ -43,7 +43,9 @@ test('the band draws each window with what is left of it', async ($, on) => {
     // 31% used of the seven-day window leaves 69.
     expect((await ui.find({ type: 'Text', text: /69% left/ }))?.text).toBe(' 69% left')
     expect((await ui.find({ type: 'Text', text: /85% left/ }))?.text).toBe(' 85% left')
-    // The five-hour window resets in 21 minutes.
+    // The five-hour window resets in 21 minutes. It is the supporting column
+    // here, not the hero: at 85% left and not running out, the 7-day window at
+    // 69% is the one that will stop you first.
     expect((await ui.find({ type: 'Text', text: /21m/ }))?.text).toBe(' · 21m')
     // Another mod's band keeps its place underneath this one.
     expect((await ui.find({ type: 'Text', text: /beneath/ }))?.text).toBe('beneath')

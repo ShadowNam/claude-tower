@@ -1,6 +1,6 @@
 {
   "name": "tower",
-  "version": "2.9.0",
+  "version": "3.0.0",
   "description": "One place to see what a Claude session is costing, what its agents are doing, how far the build is, and whether Tank is healthy.",
   "author": {
     "name": "Shadow"
@@ -23,6 +23,18 @@
       "title": "Usage band",
       "description": "Show usage windows, prompt-cache state and session cost above the prompt.",
       "default": true
+    },
+    "bandLayout": {
+      "type": "string",
+      "title": "Band layout",
+      "description": "rows is one dense line per figure. dials draws each window as a gauge. hero gives the window that will stop you first the space and shrinks the rest. cards puts each figure on its own tile. The terminal always draws rows, having no way to draw the others.",
+      "options": [
+        "rows",
+        "dials",
+        "hero",
+        "cards"
+      ],
+      "default": "dials"
     },
     "agentsPanel": {
       "type": "boolean",

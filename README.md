@@ -54,6 +54,26 @@ as though it were current. When more than one of your sessions is alive, the
 band says how many, which is the answer to "why did that drop while I was
 reading".
 
+### Layouts
+
+The same figures, arranged four ways. Change it in `/config`; nothing restarts.
+
+- **`rows`** — one dense line, every figure the same weight. The most in the
+  least space.
+- **`dials`** — each window as an arc gauge with its figure inside. Reads as an
+  instrument. An arc gives less length per percent than a bar, so it is the
+  less precise of the two; it is chosen for being quicker to read, not finer.
+- **`hero`** — the window that will stop you first gets the space and the rest
+  shrink. Which one that is changes through the day: a window on course to run
+  out wins over one that is merely emptier, because a deadline changes what you
+  do next and a level does not.
+- **`cards`** — every figure on its own tile, all equal. Scans well, takes the
+  most room.
+
+**The terminal always draws `rows`**, whatever the setting says. It can draw
+neither a gauge nor a tile, and an arc made of text is a worse bar rather than
+a dial.
+
 **Usage** — how much of your 5-hour and 7-day windows is left, when each resets, whether the
 prompt cache is warm and what re-sending the context will cost once it is not, and what the
 engine says the session has cost. When a window is being spent fast enough to run out
@@ -78,6 +98,7 @@ Everything is in `/config`, under Tower.
 | Setting | Default | Notes |
 |---|---|---|
 | Usage band | on | |
+| Band layout | `dials` | `rows`, `dials`, `hero`, `cards` — see below |
 | Agents panel | on | |
 | Build status bar | on | |
 

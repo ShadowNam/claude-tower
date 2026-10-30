@@ -367,3 +367,4 @@ test('only long-dead heartbeats are swept, and never this session’s own', asyn
   expect(deadKeys(entries, NOW, mine)).toEqual(['seen:old'])
   expect(deadKeys(entries, NOW, mine)).not.toContain(mine)
 })
+

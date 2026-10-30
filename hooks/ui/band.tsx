@@ -1,13 +1,13 @@
 import { PANE, totalsOf } from '../core/agents'
 import { headlineOf, othersOf, viewOf } from '../core/builds'
 import { at, dots, since, tokens, until, usd } from '../core/fmt'
-import { CAPSULE_SIZE, capsule, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
+import { CAPSULE_SIZE, capsule, DIAL_SIZE, dial, MARK_SIZE, mark, ORB_SIZE, orb } from './art'
 import type { Feature } from '../core/kinds'
 import { rewarmCost } from '../core/prices'
 import { heaviestOf } from '../core/engine'
 import { FAULT_MS, faultWord } from '../core/shape'
 import { readAgents, readBuilds, readEdits, readPlan, readShape, readTick, readUsage } from '../core/state'
-import { cacheView, headroom, TTL_MIN } from '../core/usage'
+import { cacheView, headroom, heroOf, layoutOf, TTL_MIN } from '../core/usage'
 import { BAD, BG, COLD, DIM, EMPTY, INK, OK, ORANGE, TEXT, WARN, YELLOW } from './theme'
 
 import type { UsageWindow } from '../../types'
@@ -78,6 +78,7 @@ function partOf(w: UsageWindow, now: number, cells: number): Part {
  */
 export const registerBand: Feature = (on, options) => {
   const wantsUsage = options.usageBand === true
+  const layout = layoutOf(options.bandLayout)
   const wantsAgents = options.agentsPanel === true
   const wantsBuilds = options.buildBar === true
   if (!wantsUsage && !wantsAgents && !wantsBuilds) return
@@ -230,7 +231,97 @@ export const registerBand: Feature = (on, options) => {
       )
     }
 
-    const windows = windowList.map(isWide ? wideWindow : blockWindow)
+    /** A supporting figure: quiet label, the value, one line of detail. */
+    const column = (key: string, w: UsageWindow, cells: number, boxed: boolean) => {
+      const p = partOf(w, now, cells)
+      return (
+        <Box
+          key={key}
+          flexDirection="column"
+          flexShrink={0}
+          hover={{ scope: key }}
+          {...(boxed ? { paddingX: 1, backgroundColor: BG } : {})}
+        >
+          <Text size="caption" color={DIM}>{p.name}</Text>
+          <Text weight="bold" color={p.color} tabular>{p.left}% left</Text>
+          {Svg === null ? (
+            <Text color={p.color}>{p.on}<Text color={EMPTY}>{p.off}</Text></Text>
+          ) : (
+            <Svg source={capsule(p.left, p.color, `${p.name}: ${p.left}% left`)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
+          )}
+          {p.empty === '' ? (
+            p.reset === '' ? null : <Text size="footnote" color={DIM} tabular>{p.reset}</Text>
+          ) : (
+            <Text size="footnote" color={WARN} weight="bold" tabular>out ~{p.empty}</Text>
+          )}
+        </Box>
+      )
+    }
+
+    const asDial = (key: string, w: UsageWindow) => {
+      const p = partOf(w, now, CELLS)
+      return (
+        <Box key={key} flexDirection="column" alignItems="center" flexShrink={0} hover={{ scope: key }}>
+          <Svg
+            source={dial(p.left, p.color, p.name, `${p.name}: ${p.left}% left${p.reset === '' ? '' : `, resets ${p.reset}`}`)}
+            alt={`${p.name} ${p.left}% left`}
+            {...DIAL_SIZE}
+          />
+          {p.isLow ? (
+            <Text backgroundColor={BAD} color={INK} weight="bold">{' LOW '}</Text>
+          ) : p.empty === '' ? (
+            <Text size="caption" color={DIM} tabular>{p.reset}</Text>
+          ) : (
+            <Text size="caption" color={WARN} weight="bold" tabular>out ~{p.empty}</Text>
+          )}
+        </Box>
+      )
+    }
+
+    const asHero = (key: string, w: UsageWindow) => {
+      const p = partOf(w, now, CELLS)
+      return (
+        <Box key={key} flexDirection="column" flexShrink={0} paddingX={1} backgroundColor={BG} hover={{ scope: key }}>
+          <Text size="caption" color={DIM}>
+            {p.name === '7D' ? '7-DAY WINDOW' : p.name === '5H' ? '5-HOUR WINDOW' : p.name}
+          </Text>
+          <Box flexDirection="row" alignItems="center" gap={1}>
+            <Text size="title" weight="bold" color={p.color} tabular>{p.left}% left</Text>
+            {p.isLow ? <Text backgroundColor={BAD} color={INK} weight="bold">{' LOW '}</Text> : null}
+            {Svg === null ? (
+              <Text color={p.color}>{p.on}<Text color={EMPTY}>{p.off}</Text></Text>
+            ) : (
+              <Svg source={capsule(p.left, p.color, `${p.name}: ${p.left}% left`)} alt={`${p.left}% left`} {...CAPSULE_SIZE} />
+            )}
+          </Box>
+          <Box flexDirection="row" gap={1}>
+            {p.reset === '' ? null : <Text size="footnote" color={DIM}>resets {p.reset}</Text>}
+            {p.empty === '' ? null : (
+              <Text size="footnote" color={WARN} weight="bold">on course to run out ~{p.empty}</Text>
+            )}
+          </Box>
+        </Box>
+      )
+    }
+
+    // The terminal always gets rows: it can draw neither a dial nor a tile,
+    // and an arc made of text is a worse bar rather than a dial.
+    const form: ReturnType<typeof layoutOf> = Svg === null || !isWide ? 'rows' : layout
+    const hero = form === 'hero' ? heroOf(windowList, now) : null
+
+    const windows =
+      form === 'rows'
+        ? windowList.map(isWide ? wideWindow : blockWindow)
+        : form === 'dials'
+          ? windowList.map((w, i) => asDial(`d${i}`, w))
+          : form === 'cards'
+            ? windowList.map((w, i) => column(`k${i}`, w, CELLS, true))
+            : [
+                ...(hero === null ? [] : [asHero('hero', hero)]),
+                ...windowList
+                  .filter(w => hero === null || w.kind !== hero.kind)
+                  .map((w, i) => column(`r${i}`, w, TIGHT_CELLS, false)),
+              ]
 
 
     // A press is a later event, not part of this draw, so it may do what a
@@ -301,7 +392,7 @@ export const registerBand: Feature = (on, options) => {
     const ctx =
       (columns >= CTX_AT || bare) && ctxPercent !== null ? (
         <Box key="ctx" flexDirection="row" flexShrink={0}>
-          <Text color={DIM}>ctx </Text>
+          <Text size="caption" color={DIM}>ctx </Text>
           <Text color={ctxPercent >= 90 ? WARN : TEXT} tabular>{ctxPercent}%</Text>
           {left === null ? (
             <Text color={DIM}> of {tokens(u.compaction?.max ?? u.ledger.window)}</Text>
@@ -315,7 +406,7 @@ export const registerBand: Feature = (on, options) => {
       u.ledger.usd === null ? null : (
         <Box key="cost" flexDirection="row" flexShrink={0}>
           <Text color={TEXT} weight="bold" tabular>{usd(u.ledger.usd)}</Text>
-          <Text color={DIM}> session</Text>
+          <Text size="caption" color={DIM}> session</Text>
         </Box>
       )
 
@@ -352,7 +443,7 @@ export const registerBand: Feature = (on, options) => {
     const bgChip =
       bg === null ? null : (
         <Box key="bg" flexDirection="row" flexShrink={0}>
-          {bg.count > 0 ? <Text color={DIM}>bg </Text> : null}
+          {bg.count > 0 ? <Text size="caption" color={DIM}>bg </Text> : null}
           {bg.count > 0 ? <Text color={TEXT} tabular>{bg.count}</Text> : null}
           {bg.count > 0 && bg.kinds.length > 0 ? <Text color={DIM}> {bg.kinds.join(', ')}</Text> : null}
           {bg.scheduled > 0 ? (
@@ -384,14 +475,14 @@ export const registerBand: Feature = (on, options) => {
       shape?.sessions === undefined || shape.sessions < 2 ? null : (
         <Box key="sessions" flexDirection="row" flexShrink={0}>
           <Text color={TEXT} tabular>{shape.sessions}</Text>
-          <Text color={DIM}> sessions</Text>
+          <Text size="caption" color={DIM}> sessions</Text>
         </Box>
       )
 
     const phaseChip =
       shape?.phase === undefined || !busy ? null : (
         <Box key="phase" flexShrink={0}>
-          <Text color={DIM}>{shape.phase}</Text>
+          <Text size="caption" color={DIM}>{shape.phase}</Text>
         </Box>
       )
 
@@ -406,16 +497,16 @@ export const registerBand: Feature = (on, options) => {
     const effortChip =
       shape?.effort === undefined || shape.effort === '' || shape.effort === 'medium' ? null : (
         <Box key="effort" flexShrink={0}>
-          <Text color={DIM}>{shape.effort}</Text>
+          <Text size="caption" color={DIM}>{shape.effort}</Text>
         </Box>
       )
 
     const editChip =
       !hasEdits || edits === null ? null : (
         <Box key="edits" flexDirection="row" flexShrink={0}>
-          <Text color={DIM}>edits </Text>
+          <Text size="caption" color={DIM}>edits </Text>
           <Text color={TEXT} tabular>{edits.files.length}</Text>
-          <Text color={DIM}> {edits.files.length === 1 ? 'file' : 'files'} </Text>
+          <Text size="caption" color={DIM}> {edits.files.length === 1 ? 'file' : 'files'} </Text>
           <Text color={OK} tabular>+{edits.added}</Text>
           <Text color={BAD} tabular> −{edits.removed}</Text>
         </Box>

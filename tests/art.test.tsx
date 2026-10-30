@@ -246,3 +246,25 @@ test('a title is what a hover reads, and cannot carry markup out', async () => {
   // A title is text from elsewhere, so it is stripped before it is markup.
   expect(capsule(62, '#e8893c', '</title><script>x</script>')).not.toContain('<script')
 })
+
+test('a shape is seated by a shadow that degrades to nothing visible', async () => {
+  // Filters render here — checked with a probe, not assumed. They do one job:
+  // seating a shape on the bar. Everything soft inside a drawing is still a
+  // gradient to transparent, which on a circle or pill is an exact blur.
+  for (const svg of [capsule(62, '#e8893c'), orb('#86c06a'), mark('#e8893c')]) {
+    expect(svg).toContain('feGaussianBlur')
+    // The region override is required, or the default box clips the blur
+    // before it can show.
+    expect(svg).toContain('x="-50%" y="-50%" width="200%" height="200%"')
+  }
+
+  // The shadow is drawn BEFORE the shape it seats, so a surface that drops
+  // filters is left with a hard edge behind rather than a missing element.
+  const svg = orb('#86c06a')
+  expect(svg.indexOf('filter="url(#') < svg.indexOf('<circle cx="11" cy="11" r="8"')).toBe(true)
+
+  // And it stays under a device pixel: further down and it reads as a sticker.
+  for (const [, dy] of svg.matchAll(/feOffset dy="([\d.]+)"/g)) {
+    expect(Number(dy) <= 2).toBe(true)
+  }
+})

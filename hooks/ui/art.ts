@@ -52,6 +52,31 @@ function styles(id: string, alive: boolean): string {
   )
 }
 
+/**
+ * A contact shadow: tight, dark and barely offset.
+ *
+ * Filters are supported here — checked with a probe rather than assumed, since
+ * no mod ships one and the answer was unknown. They earn their place in
+ * exactly one job: seating a shape on the bar. Everything soft inside a
+ * drawing is still done with a gradient to transparent, which on a circle or a
+ * pill *is* an exact blur rather than an approximation of one.
+ *
+ * The offset stays under a device pixel. At this size anything further down
+ * and to the right stops reading as a shadow and starts reading as a sticker.
+ *
+ * Whatever uses this draws the shadow shape BEHIND the real one, so a surface
+ * that drops filters is left with a hard duplicate a pixel below instead of a
+ * missing element — invisible rather than broken.
+ */
+function contact(id: string, blur: number, dy: number): string {
+  return (
+    `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%">` +
+    `<feGaussianBlur stdDeviation="${blur}"/>` +
+    `<feOffset dy="${dy}"/>` +
+    '</filter>'
+  )
+}
+
 /** A sheen travelling the length of a bar, for work that is genuinely moving. */
 function sweep(id: string, w: number): string {
   return (
@@ -231,11 +256,15 @@ export function capsule(leftPercent: number, color: string, title = '', moving =
           '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>' +
           '</linearGradient>'
         : '',
+      contact(`${id}x`, 2, 2),
       `<pattern id="${id}d" width="4" height="4" patternUnits="userSpaceOnUse">`,
       '<rect x="0" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.05"/>',
       '<rect x="2" y="2" width="1" height="1" fill="#000000" fill-opacity="0.05"/>',
       '</pattern>',
       '</defs>',
+      // Behind everything, so a dropped filter leaves a hard edge under the
+      // track rather than nothing at all.
+      `<rect x="${TRACK_X}" y="${TRACK_Y}" width="${TRACK_W}" height="${TRACK_H}" rx="${TRACK_R}" fill="#000000" fill-opacity="0.45" filter="url(#${id}x)"/>`,
       `<g clip-path="url(#${id}k)">`,
       `<rect x="${TRACK_X}" y="${TRACK_Y}" width="${TRACK_W}" height="${TRACK_H}" fill="url(#${id}f)"/>`,
       fill <= 0
@@ -318,8 +347,10 @@ export function orb(color: string, shape: 'round' | 'alert' = 'round', alive = f
       '<stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>',
       '<stop offset="1" stop-color="#ffffff" stop-opacity="0"/>',
       '</radialGradient>',
+      contact(`${id}x`, 1.6, 1.6),
       '</defs>',
       styles(id, alive),
+      `<ellipse cx="${c}" cy="${(c + r * 0.86).toFixed(2)}" rx="${(r * 0.74).toFixed(2)}" ry="${(r * 0.3).toFixed(2)}" fill="#000000" fill-opacity="0.55" filter="url(#${id}x)"/>`,
       `<circle cx="${c}" cy="${c}" r="${c}" fill="url(#${id}h)"${alive ? ` class="${id}a"` : ''}/>`,
       body,
       rim,
@@ -356,7 +387,9 @@ export function mark(color: string): string {
       `<stop offset="0" stop-color="${hex(lift(base, 0.34))}"/>`,
       `<stop offset="1" stop-color="${hex(drop(base, 0.26))}"/>`,
       '</linearGradient>',
+      contact(`${id}x`, 1.2, 1.4),
       '</defs>',
+      `<path d="${path}" fill="#000000" fill-opacity="0.5" filter="url(#${id}x)"/>`,
       `<path d="${path}" fill="url(#${id}f)"/>`,
       `<g clip-path="url(#${id}k)">`,
       `<path d="${path}" fill="none" stroke="#ffffff" stroke-opacity="0.34" stroke-width="4"/>`,

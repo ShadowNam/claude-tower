@@ -180,7 +180,7 @@ export const registerAgentsPane: Feature = (on, options) => {
           </Box>
         ) : run.touched.length > 0 ? (
           <Box key={`a${i}`} flexDirection="row">
-            <Text color={DIM}>{pad}  {run.touched.length} files touched</Text>
+            <Text color={DIM}>{pad}  {run.touched.length} {run.touched.length === 1 ? 'file' : 'files'} touched</Text>
           </Box>
         ) : null
 

@@ -126,6 +126,6 @@ export function readPlan($: EngineInterface): Promise<Plan | null> {
   return read($, plan)
 }
 
-export async function writePlan($: EngineInterface, fn: (prev: Plan | null) => Plan): Promise<void> {
+export async function writePlan($: EngineInterface, fn: (prev: Plan | null) => Plan | null): Promise<void> {
   await update($, plan, fn)
 }

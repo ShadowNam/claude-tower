@@ -153,6 +153,8 @@ export type Weight = { name: string; tokens: number }
 
 /** The task list as the band shows it. */
 export type Plan = {
+  /** Kept so a later advance, which names no steps, can be applied to them. */
+  steps: readonly { content: string; status: string }[]
   done: number
   total: number
   /** The step in progress, truncated; empty when none is marked. */

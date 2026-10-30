@@ -155,10 +155,21 @@ test('the last edit becomes a hunk the engine can colour', async () => {
   expect(hunk.split('\n')).toEqual([
     '--- a/cart.ts',
     '+++ b/cart.ts',
-    '@@',
+    // The counts are not decoration: without them the engine refuses to read
+    // this as a diff and draws it as plain code, saying so in the transcript.
+    // The start lines are unknowable, so both are 1, as a fragment's are.
+    '@@ -1,1 +1,1 @@',
     '-const a = 1',
     '+const a = 2',
   ])
+
+  // The counts must describe the lines actually emitted. A hunk cut to the
+  // display limit fails the same check for the opposite reason otherwise.
+  const big = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n')
+  const header = /@@ -1,(\d+) \+1,(\d+) @@/.exec(hunkOf('/a.ts', big, big))
+  const body = hunkOf('/a.ts', big, big).split('\n')
+  expect(Number(header?.[1])).toBe(body.filter(l => l.startsWith('-') && !l.startsWith('---')).length)
+  expect(Number(header?.[2])).toBe(body.filter(l => l.startsWith('+') && !l.startsWith('+++')).length)
 
   // A Write has nothing before it, so the body is all additions. The `--- a/`
   // header carries hyphens of its own, so only the body is checked.

@@ -30,7 +30,7 @@ export function isPlanTool(tool: string): boolean {
   return LISTS.includes(tool)
 }
 
-type Step = { content: string; status: string }
+export type Step = { content: string; status: string }
 
 /** The steps out of a call's arguments, in either host's spelling. */
 function stepsOf(input: Readonly<Record<string, unknown>>): Step[] {
@@ -50,24 +50,75 @@ function stepsOf(input: Readonly<Record<string, unknown>>): Step[] {
 /** How long a step's name may run before the row truncates it. */
 const NAME_MAX = 48
 
+/** The stored steps, folded into what the band draws. */
+function viewOf(steps: readonly Step[]): Plan | null {
+  if (steps.length === 0) return null
+  const done = steps.filter(s => s.status === 'completed').length
+  const name = steps.find(s => s.status === 'in_progress')?.content ?? ''
+  return {
+    steps,
+    done,
+    total: steps.length,
+    now: name.length > NAME_MAX ? `${name.slice(0, NAME_MAX - 1)}…` : name,
+    finished: done >= steps.length,
+  }
+}
+
+/**
+ * A later update that names no steps, applied to the ones already held.
+ *
+ * This is why the band read `0/5` through a whole plan: a host advances a list
+ * with `{ advance: true }` or `{ done: [2], start: 4 }` and sends no items, so
+ * reading only the calls that carry a list meant reading only the first one.
+ * The steps are kept so the moves can be applied to them.
+ */
+export function advanceOf(prev: Plan | null, input: Readonly<Record<string, unknown>>): Plan | null {
+  if (prev === null || prev.steps.length === 0) return null
+  const steps = prev.steps.map(s => ({ ...s }))
+  const at = (n: unknown): number => (typeof n === 'number' ? n - 1 : -1)
+
+  let moved = false
+
+  if (input['advance'] === true) {
+    const running = steps.findIndex(s => s.status === 'in_progress')
+    if (running >= 0) {
+      ;(steps[running] as Step).status = 'completed'
+      moved = true
+    }
+    const next = steps.find(s => s.status === 'pending')
+    if (next !== undefined) {
+      next.status = 'in_progress'
+      moved = true
+    }
+  }
+
+  const done = input['done']
+  if (Array.isArray(done)) {
+    for (const n of done) {
+      const i = at(n)
+      if (i >= 0 && i < steps.length) {
+        ;(steps[i] as Step).status = 'completed'
+        moved = true
+      }
+    }
+  }
+
+  const start = at(input['start'])
+  if (start >= 0 && start < steps.length) {
+    ;(steps[start] as Step).status = 'in_progress'
+    moved = true
+  }
+
+  return moved ? viewOf(steps) : null
+}
+
 /**
  * A call's arguments turned into what the band draws, or null when the call
  * carries no list — an `advance` or `done` update names no steps, and the
  * previous reading stays right.
  */
 export function planOf(input: Readonly<Record<string, unknown>>): Plan | null {
-  const steps = stepsOf(input)
-  if (steps.length === 0) return null
-
-  const done = steps.filter(s => s.status === 'completed').length
-  const running = steps.find(s => s.status === 'in_progress')
-  const name = running?.content ?? ''
-  return {
-    done,
-    total: steps.length,
-    now: name.length > NAME_MAX ? `${name.slice(0, NAME_MAX - 1)}…` : name,
-    finished: done >= steps.length,
-  }
+  return viewOf(stepsOf(input))
 }
 
 /**
@@ -81,7 +132,11 @@ export async function notePlan(
   input: Readonly<Record<string, unknown>>,
 ): Promise<void> {
   if (!isPlanTool(tool)) return
-  const plan = planOf(input)
-  if (plan === null) return
-  await writePlan($, () => plan)
+  const listed = planOf(input)
+  if (listed !== null) {
+    await writePlan($, () => listed)
+    return
+  }
+  // No list in this call: it is a move within the one already held.
+  await writePlan($, prev => advanceOf(prev, input) ?? prev)
 }

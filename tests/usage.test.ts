@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { project, projectWithin, trim } from '../hooks/core/burn'
 import { backgroundOf, heaviestOf, phaseOf, ttlOf } from '../hooks/core/engine'
-import { isPlanTool, planOf } from '../hooks/core/plan'
+import { advanceOf, isPlanTool, planOf } from '../hooks/core/plan'
 import { fold as foldRate, median, rateOf } from '../hooks/core/rate'
 import { priceOf, rewarmCost } from '../hooks/core/prices'
 import { cacheView, compactionOf, fold, headroom } from '../hooks/core/usage'
@@ -214,18 +214,52 @@ test('a plan is read from whichever host wrote it', async () => {
     { content: 'two', status: 'in_progress' },
     { content: 'three', status: 'pending' },
   ] }
-  expect(planOf(todos)).toEqual({ done: 1, total: 3, now: 'two', finished: false })
+  const plan = planOf(todos)
+  expect(plan?.done).toBe(1)
+  expect(plan?.total).toBe(3)
+  expect(plan?.now).toBe('two')
+  expect(plan?.finished).toBe(false)
 
   // The desktop app spells the same thing differently.
-  expect(planOf({ items: [{ content: 'a', status: 'completed' }] }))
-    .toEqual({ done: 1, total: 1, now: '', finished: true })
+  expect(planOf({ items: [{ content: 'a', status: 'completed' }] })?.finished).toBe(true)
 
-  // An advance or done update names no steps, so the last reading stands.
   expect(planOf({ advance: true })).toBe(null)
   expect(planOf({ items: [] })).toBe(null)
   expect(isPlanTool('TodoWrite')).toBe(true)
   expect(isPlanTool('mcp__ccd_turn__update_plan')).toBe(true)
   expect(isPlanTool('Bash')).toBe(false)
+})
+
+test('a plan follows the moves that name no steps', async () => {
+  // The band read 0/5 through an entire plan because of this: a host advances
+  // a list with { advance: true } and sends no items, so a reader that only
+  // took calls carrying a list only ever read the first one.
+  const first = planOf({ items: [
+    { content: 'one', status: 'in_progress' },
+    { content: 'two', status: 'pending' },
+    { content: 'three', status: 'pending' },
+  ] })
+  expect(first?.done).toBe(0)
+
+  const second = advanceOf(first, { advance: true })
+  expect(second?.done).toBe(1)
+  expect(second?.now).toBe('two')
+
+  const third = advanceOf(second, { advance: true })
+  expect(third?.done).toBe(2)
+  expect(third?.now).toBe('three')
+
+  // Out of order, 1-based, as the host numbers them.
+  const jumped = advanceOf(first, { done: [1, 2], start: 3 })
+  expect(jumped?.done).toBe(2)
+  expect(jumped?.now).toBe('three')
+
+  // The last advance completes it with nothing left to start.
+  expect(advanceOf(third, { advance: true })?.finished).toBe(true)
+
+  // A move with no plan behind it, and a call that moves nothing, change nothing.
+  expect(advanceOf(null, { advance: true })).toBe(null)
+  expect(advanceOf(first, { verbose: true })).toBe(null)
 })
 
 test('the cache lifetime is the engine’s where it said it, an hour where it did not', async () => {

@@ -69,20 +69,32 @@ const HUNK_MAX = 14
  * bound in exactly the sessions that edit most; and the useful question at a
  * glance is "what did it just change", not "what has it changed all day".
  *
- * `@@` carries no line numbers because nothing in the call says where in the
- * file the text sat. A fabricated range would be worse than an honest `@@`.
+ * The `@@` header must carry counts or the engine refuses to read it as a diff
+ * and draws it as plain code — which is what it did, saying so in the
+ * transcript: "Added line count did not match for hunk at line 3". A bare `@@`
+ * was an attempt at honesty that simply turned the colouring off.
+ *
+ * The counts are knowable and are stated. The *start lines* are not — nothing
+ * in the call says where in the file the text sat — so both are `1`, which is
+ * what a diff of a fragment conventionally uses. The counts have to describe
+ * the lines actually emitted, not the lines that existed, or a truncated hunk
+ * fails the same check for the opposite reason.
  */
 export function hunkOf(path: string, before: string, after: string): string {
   const name = path.replace(/^.*[\\/]/, '')
   const cut = (text: string, mark: string): string[] =>
     text === '' ? [] : text.split('\n').slice(0, HUNK_MAX).map(l => mark + l)
+
+  const removed = cut(before, '-')
+  const added = cut(after, '+')
   const trimmed = before.split('\n').length > HUNK_MAX || after.split('\n').length > HUNK_MAX
+
   return [
     `--- a/${name}`,
     `+++ b/${name}`,
-    '@@',
-    ...cut(before, '-'),
-    ...cut(after, '+'),
+    `@@ -1,${removed.length} +1,${added.length} @@`,
+    ...removed,
+    ...added,
     ...(trimmed ? ['\\ truncated'] : []),
   ].join('\n')
 }

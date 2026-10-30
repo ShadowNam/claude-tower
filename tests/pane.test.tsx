@@ -88,6 +88,6 @@ test('a tool call shows on the row that is running it', async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   // The call has finished, so the row shows what it left behind, not the tool.
   // The leading space is the tree indent: this run sits one level under main.
-  expect((await ui.find({ type: 'Text', text: /files touched/ }))?.text).toBe('    1 files touched')
+  expect((await ui.find({ type: 'Text', text: /touched/ }))?.text).toBe('    1 file touched')
   await ui.unmount()
 })

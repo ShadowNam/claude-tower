@@ -1,5 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
+import { reasonOf } from './fmt'
 import type { Feature, Options } from './kinds'
 import { notify } from './notify'
 import { readTank, writeTank } from './state'
@@ -160,8 +161,10 @@ export async function pollOne($: EngineInterface, name: string, now: number): Pr
     }
     return instanceOf(name, payload, now)
   } catch (err) {
-    const text = err instanceof Error ? err.message : 'did not answer'
-    return { name, ok: false, error: text.slice(0, 120), active: [], waiting: [], failed: [], queues: [], checkedAt: now }
+    // Redacted, because a Tank URL carries a bearer token and an error that
+    // quotes the request would otherwise put it in the panel and the store.
+    const text = reasonOf(err, 400, 'did not answer')
+    return { name, ok: false, error: text, active: [], waiting: [], failed: [], queues: [], checkedAt: now }
   }
 }
 

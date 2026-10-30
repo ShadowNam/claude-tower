@@ -101,6 +101,24 @@ sends cannot, so test after any change.
 - `/tower-hook` — print the snippet that lets a build script report its own progress
 - `/tower-notify` — what would be sent; `/tower-notify test` sends the first message
 
+## Auto mode switches off everything that needs an MCP server
+
+In a session whose permission mode is **auto**, `$.mcp.call` is refused:
+
+> the server-side auto mode classifier gave no verdict for `<tool>`: the request
+> that produced this action did not ask for one
+
+Auto mode is evaluated per model request, and a mod's call belongs to no request —
+it comes from a timer or a slash command, with no model turn behind it to judge. So
+it fails closed, by design, and no setting here changes that.
+
+What stops working: **Tank polling**, the **Tank watchdog** and **WhatsApp
+notifications**. What keeps working: the **usage band**, the **agents panel** and the
+**build bar**, none of which leave the session.
+
+Switch the session's permission mode to anything else and they come back. Outside
+auto mode a mod's call carries the engine's own credentials and raises no prompt.
+
 ## If you see nothing
 
 Run `/tower`. It answers even when every other part of the mod has failed,

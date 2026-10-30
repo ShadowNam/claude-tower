@@ -1,22 +1,11 @@
 import { startAgents } from './agents'
-import { redact } from './builds'
 import { noteFailures, startDiag } from './diag'
+import { reasonOf } from './fmt'
 import type { Feature } from './kinds'
 import { startNotify } from './notify'
 import { startTank } from './tank'
 import { startUsage } from './usage'
 import { startWatch } from './watch'
-
-/** How much of a thrown reason is worth repeating in `/tower`. */
-const REASON_MAX = 120
-
-/** What a thrown value says, with anything key-shaped taken out. */
-function reasonOf(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  const clean = redact(raw).replace(/\s+/g, ' ').trim()
-  if (clean === '') return 'threw nothing'
-  return clean.length > REASON_MAX ? `${clean.slice(0, REASON_MAX)}…` : clean
-}
 
 /**
  * The mod's one session.start hook. The engine takes a single unmatched
@@ -40,20 +29,20 @@ export const registerBoot: Feature = (on, options) => {
       await startDiag($, e.surface ?? 'none', options)
     } catch (err) {
       // Nothing can be reported if this is what broke; the session still runs.
-      failed.push(`diag: ${reasonOf(err)}`)
+      failed.push(`diag: ${reasonOf(err, 300)}`)
     }
 
     try {
       await startNotify($)
     } catch (err) {
-      failed.push(`notify: ${reasonOf(err)}`)
+      failed.push(`notify: ${reasonOf(err, 300)}`)
     }
 
     if (options.usageBand === true) {
       try {
         await startUsage($)
       } catch (err) {
-        failed.push(`usage: ${reasonOf(err)}`)
+        failed.push(`usage: ${reasonOf(err, 300)}`)
       }
     }
 
@@ -61,7 +50,7 @@ export const registerBoot: Feature = (on, options) => {
       try {
         await startAgents($)
       } catch (err) {
-        failed.push(`agents: ${reasonOf(err)}`)
+        failed.push(`agents: ${reasonOf(err, 300)}`)
       }
     }
 
@@ -70,7 +59,7 @@ export const registerBoot: Feature = (on, options) => {
     try {
       await startWatch($, options)
     } catch (err) {
-      failed.push(`builds: ${reasonOf(err)}`)
+      failed.push(`builds: ${reasonOf(err, 300)}`)
     }
 
     try {
@@ -78,7 +67,7 @@ export const registerBoot: Feature = (on, options) => {
     } catch (err) {
       // A Tank that cannot be reached at startup is the panel's news, not the
       // session's, but it is still worth naming in the diagnostics.
-      failed.push(`tank: ${reasonOf(err)}`)
+      failed.push(`tank: ${reasonOf(err, 300)}`)
     }
 
     if (failed.length > 0) {

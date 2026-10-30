@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { canSend, dayOf, decide, EMPTY_POLICY, gatewayReason, inQuietHours, levelOf, record, render, wants } from '../hooks/core/notify'
+import { reasonOf } from '../hooks/core/fmt'
+import { canSend, dayOf, decide, EMPTY_POLICY, inQuietHours, levelOf, record, render, wants } from '../hooks/core/notify'
 
 import type { Policy } from '../hooks/core/notify'
 
@@ -102,12 +103,38 @@ test('a gateway refusal is reported whole, including the server it tried', async
   const real = new Error(
     '$.mcp.call: no connected MCP tool "whatsapp_send_message" on a server named "WhatsApp Gateway"',
   )
-  const reason = gatewayReason(real)
+  const reason = reasonOf(real, 600, 'the gateway refused')
   expect(reason).toContain('whatsapp_send_message')
   expect(reason).toContain('WhatsApp Gateway')
 
   // Anything key-shaped still goes, and a thrown non-error still reads plainly.
-  expect(gatewayReason(new Error('refused: Bearer ghp_abcdefghijklmnop'))).toBe('refused: Bearer <redacted>')
-  expect(gatewayReason('nope')).toBe('the gateway refused')
-  expect(gatewayReason(new Error('   '))).toBe('the gateway refused')
+  expect(reasonOf(new Error('refused: Bearer ghp_abcdefghijklmnop'), 600, 'the gateway refused')).toBe('refused: Bearer <redacted>')
+  expect(reasonOf(new TypeError(''), 600, 'the gateway refused')).toBe('the gateway refused')
+  expect(reasonOf(new Error('   '), 600, 'the gateway refused')).toBe('the gateway refused')
+})
+
+test('the auto mode refusal survives whole, operative clause and all', async () => {
+  // Verbatim from a real send under permissionMode "auto". The clause that
+  // says what is wrong sits 160 characters in, after the tool's full name, and
+  // the advice runs on well past it.
+  const real = new Error(
+    'The server-side auto mode classifier gave no verdict for ' +
+      'mcp__aa465f29-6c9e-4063-966d-507df8b7208b__whatsapp_send_message: the request that ' +
+      'produced this action did not ask for one. Issue the action again once, as-is; if it ' +
+      "is denied again, continue with other tasks that don't require it and tell the user " +
+      'that auto mode could not evaluate it.',
+  )
+  const reason = reasonOf(real, 600, 'the gateway refused')
+  expect(reason).toContain('did not ask for one')
+  expect(reason.endsWith('…')).toBe(false)
+})
+
+test('a Tank poll failure cannot carry its bearer token into the panel', async () => {
+  // Tank is reached over HTTP with a bearer header, so an error that quotes the
+  // request would otherwise be stored and drawn verbatim.
+  const leaky = new Error('connect ECONNREFUSED; sent Authorization: Bearer tnk_live_abcdef123456')
+  const reason = reasonOf(leaky, 400, 'did not answer')
+  expect(reason).toContain('ECONNREFUSED')
+  expect(reason).not.toContain('tnk_live_abcdef123456')
+  expect(reason).toContain('Bearer <redacted>')
 })

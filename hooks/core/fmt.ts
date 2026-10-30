@@ -61,3 +61,23 @@ export function panelsOf(options: Readonly<Record<string, unknown>>): string[] {
   ]
   return all.filter(([key]) => options[key] === true).map(([, label]) => label)
 }
+
+/** Anything that looks like a credential never reaches the band or the store. */
+export function redact(line: string): string {
+  return line.replace(/(ghp_|github_pat_|sk-|AKIA|Bearer\s)\S+/g, '$1<redacted>')
+}
+
+/**
+ * What a thrown value said, tidied for somewhere a person will read it.
+ *
+ * Generous by default, because these are read once and acted on: a refusal is
+ * often the only account of something that did not happen, and the operative
+ * clause tends to sit at the end. Cutting one short has twice cost a diagnosis
+ * here — the engine names the server, or what it wanted, after the preamble.
+ */
+export function reasonOf(err: unknown, max = 600, fallback = 'no reason given'): string {
+  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
+  const clean = redact(raw).replace(/\s+/g, ' ').trim()
+  if (clean === '') return fallback
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean
+}

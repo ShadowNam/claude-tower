@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import { estimate, remember } from './eta'
 import type { Estimate } from './eta'
-import { since } from './fmt'
+import { redact, since } from './fmt'
 import { writeBuilds } from './state'
 
 import type { Build, BuildRun, BuildState } from '../../types'
@@ -69,11 +69,6 @@ export function keyOf(cwd: string, target: string, isCold: boolean): string {
     h = Math.imul(h, 0x01000193) >>> 0
   }
   return h.toString(16).padStart(8, '0')
-}
-
-/** Anything that looks like a credential never reaches the band or the store. */
-export function redact(line: string): string {
-  return line.replace(/(ghp_|github_pat_|sk-|AKIA|Bearer\s)\S+/g, '$1<redacted>')
 }
 
 /** The one line worth showing from a failed build's output. */

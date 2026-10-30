@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { classify, errorLineOf, headlineOf, keyOf, projectOf, redact, viewOf } from '../hooks/core/builds'
+import { classify, errorLineOf, headlineOf, keyOf, projectOf, viewOf } from '../hooks/core/builds'
+import { redact } from '../hooks/core/fmt'
 import { confidenceOf, estimate, wpct } from '../hooks/core/eta'
 
 import type { Build, BuildRun } from '../types'
